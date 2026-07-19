@@ -60,6 +60,69 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-# TODO(release-подпись): добавить отдельную задачу после создания владельцем
-# репозиторных секретов хранилища ключей. Debug APK устанавливается и подходит для
-# проверки контракта, но не должен считаться окончательным release-артефактом.
+      - name: Проверка наличия секретов release-подписи
+        id: release_secrets
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ADMIN_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ADMIN_RELEASE_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ADMIN_RELEASE_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ADMIN_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$KEYSTORE_BASE64" && -n "$STORE_PASSWORD" && -n "$KEY_ALIAS" && -n "$KEY_PASSWORD" ]]; then
+            printf 'enabled=true\n' >> "$GITHUB_OUTPUT"
+            printf 'Release-подпись настроена. Собираю подписанный APK.\n'
+          else
+            printf 'enabled=false\n' >> "$GITHUB_OUTPUT"
+            printf 'Release-подпись пока не настроена. Debug APK уже собран.\n'
+          fi
+
+      - name: Восстановление release-ключа
+        if: steps.release_secrets.outputs.enabled == 'true'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ADMIN_RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > release.keystore
+          test -s release.keystore
+          chmod 600 release.keystore
+
+      - name: Сборка подписанного release APK
+        if: steps.release_secrets.outputs.enabled == 'true'
+        env:
+          ORG_GRADLE_PROJECT_ADMIN_RELEASE_STORE_FILE: ../release.keystore
+          ORG_GRADLE_PROJECT_ADMIN_RELEASE_STORE_PASSWORD: ${{ secrets.ADMIN_RELEASE_STORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_ADMIN_RELEASE_KEY_ALIAS: ${{ secrets.ADMIN_RELEASE_KEY_ALIAS }}
+          ORG_GRADLE_PROJECT_ADMIN_RELEASE_KEY_PASSWORD: ${{ secrets.ADMIN_RELEASE_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon :app:assembleRelease --stacktrace
+
+      - name: Проверка release-подписи
+        if: steps.release_secrets.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(sed -n 's/^ADMIN_VERSION_NAME=//p' gradle.properties | tail -n 1 | tr -d '\r')"
+          apk="app/build/outputs/apk/release/app-release.apk"
+          verify_output="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk")"
+          printf '%s\n' "$verify_output"
+          expected='Signer #1 certificate SHA-256 digest: c6b600f8a6d6f32f325172407e7a76d7bf44f9962b357d2eb2ba99f78f002f5e'
+          if ! grep -Fqi "$expected" <<< "$verify_output"; then
+            printf '::error::APK подписан неизвестным сертификатом.\n'
+            exit 1
+          fi
+          mkdir -p dist-release
+          cp "$apk" "dist-release/GsGit-Admin-${version}-release.apk"
+          cd dist-release
+          sha256sum "GsGit-Admin-${version}-release.apk" > SHA256SUMS.txt
+
+      - name: Загрузка подписанного release APK
+        if: steps.release_secrets.outputs.enabled == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: gsgit-admin-release-${{ github.run_number }}
+          path: dist-release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Удаление release-ключа с runner
+        if: always()
+        run: rm -f release.keystore

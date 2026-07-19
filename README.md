@@ -41,6 +41,16 @@ Release-подпись намеренно не хранится в репози�
 передать путь, пароли и псевдоним ключа через Gradle-свойства `ADMIN_RELEASE_*`.
 Файл хранилища и его пароли нельзя добавлять в коммиты.
 
+Для подписанной сборки в GitHub Actions используются четыре репозиторных секрета:
+
+- `ADMIN_RELEASE_KEYSTORE_BASE64`;
+- `ADMIN_RELEASE_STORE_PASSWORD`;
+- `ADMIN_RELEASE_KEY_ALIAS`;
+- `ADMIN_RELEASE_KEY_PASSWORD`.
+
+Если все четыре секрета заданы, workflow дополнительно собирает release APK, проверяет
+его сертификат и публикует отдельный приватный артефакт `gsgit-admin-release-*`.
+
 ## Графика
 
 Оригинал сгенерированной иконки хранится в `artwork/gsgit-admin-icon.png`.
