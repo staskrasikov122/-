@@ -84,7 +84,18 @@ jobs:
           KEYSTORE_BASE64: ${{ secrets.ADMIN_RELEASE_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          normalized="${KEYSTORE_BASE64#ADMIN_RELEASE_KEYSTORE_BASE64=}"
+          marker='/u3+7QAAAAIA'
+          if [[ "$KEYSTORE_BASE64" == *"$marker"* ]]; then
+            normalized="$marker${KEYSTORE_BASE64#*"$marker"}"
+          else
+            normalized="${KEYSTORE_BASE64#ADMIN_RELEASE_KEYSTORE_BASE64=}"
+          fi
+          normalized="$(printf '%s' "$normalized" | tr -cd 'A-Za-z0-9+/=')"
+          normalized="${normalized:0:5196}"
+          if [[ "${#normalized}" -ne 5196 ]]; then
+            printf '::error::Base64 release-ключа имеет неверную длину после очистки. Ожидалось 5196 символов.\n'
+            exit 1
+          fi
           printf '%s' "$normalized" | tr -d '[:space:]' | base64 --decode > release.keystore
           test -s release.keystore
           expected='86b610757b38329dd644dc2537c9f8664d51adc1e7c074dd7a081a9d41d7c90a'
