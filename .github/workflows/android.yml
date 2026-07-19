@@ -1,0 +1,55 @@
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: admin-android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - uses: android-actions/setup-android@v4
+
+      - name: Install Android SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Validate and build installable APK
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug --stacktrace
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/GsGit-Admin-1.0.0.apk
+          cd dist
+          sha256sum GsGit-Admin-1.0.0.apk > SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: gsgit-admin-${{ github.run_number }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+# TODO(release signing): add a separate signed release job after the owner creates
+# repository-scoped keystore secrets. Debug APK is installable and stable enough for
+# contract testing, but it must not be treated as the final signed release artifact.

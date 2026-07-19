@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="admin_background">#050605</color>
+    <color name="launcher_background">#000000</color>
+    <color name="admin_accent">#2EE66B</color>
+</resources>

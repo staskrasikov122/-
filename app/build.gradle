@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'org.jetbrains.kotlin.plugin.compose'
+}
+
+def versionNameValue = providers.gradleProperty('ADMIN_VERSION_NAME').get()
+def versionCodeValue = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'org.gsgit.admin'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'org.gsgit.admin'
+        minSdk 26
+        targetSdk 36
+        versionCode versionCodeValue
+        versionName versionNameValue
+    }
+
+    signingConfigs {
+        release {
+            def storePath = providers.gradleProperty('ADMIN_RELEASE_STORE_FILE').orNull
+            if (storePath) storeFile file(storePath)
+            storePassword providers.gradleProperty('ADMIN_RELEASE_STORE_PASSWORD').orNull
+            keyAlias providers.gradleProperty('ADMIN_RELEASE_KEY_ALIAS').orNull
+            keyPassword providers.gradleProperty('ADMIN_RELEASE_KEY_PASSWORD').orNull
+        }
+    }
+
+    buildTypes {
+        release {
+            if (providers.gradleProperty('ADMIN_RELEASE_STORE_FILE').isPresent) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
+
+    packaging {
+        resources.excludes += '/META-INF/{AL2.0,LGPL2.1}'
+    }
+
+    lint {
+        abortOnError true
+        checkReleaseBuilds true
+    }
+}
+
+dependencies {
+    implementation platform('androidx.compose:compose-bom:2024.12.01')
+    implementation 'androidx.core:core-ktx:1.15.0'
+    implementation 'androidx.activity:activity-compose:1.10.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.compose.material:material-icons-extended'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+
+    testImplementation 'junit:junit:4.13.2'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+}
