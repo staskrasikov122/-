@@ -5,6 +5,7 @@
 /build/
 /app/build/
 /dist/
+/dist-release/
 /.kotlin/
 *.jks
 *.keystore
