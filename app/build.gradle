@@ -31,7 +31,7 @@ android {
 
     buildTypes {
         release {
-            if (providers.gradleProperty('ADMIN_RELEASE_STORE_FILE').isPresent) {
+            if (providers.gradleProperty('ADMIN_RELEASE_STORE_FILE').present) {
                 signingConfig signingConfigs.release
             }
             minifyEnabled true
