@@ -74,7 +74,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun unlock(key: String) {
         val normalized = key.trim()
         if (normalized.isEmpty()) {
-            _state.update { it.copy(auth = AuthState.Locked("Enter X-Admin-Key")) }
+            _state.update { it.copy(auth = AuthState.Locked("Введите X-Admin-Key")) }
             return
         }
         validateKey(normalized, persisted = false)
@@ -163,7 +163,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update {
                     it.copy(config = LoadState.Ready(updated), savingConfig = false)
                 }
-                _messages.emit("Saved, clients pick up within a minute")
+                _messages.emit("Сохранено. Клиенты получат настройки в течение минуты")
                 loadStats()
             } catch (failure: ApiFailure) {
                 _state.update { it.copy(savingConfig = false) }
@@ -187,7 +187,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                         togglingKillSwitch = false,
                     )
                 }
-                _messages.emit(if (updated.maintenance.isBlank()) "Kill-switch disabled" else "Kill-switch enabled")
+                _messages.emit(if (updated.maintenance.isBlank()) "Блокировка отключена" else "Блокировка включена")
                 loadStats()
             } catch (failure: ApiFailure) {
                 _state.update { it.copy(togglingKillSwitch = false) }
@@ -200,7 +200,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         val key = sessionKey ?: return
         if (_state.value.sendingAnnouncement) return
         if (title.isBlank() || body.isBlank()) {
-            _messages.tryEmit("Title and text are required")
+            _messages.tryEmit("Заголовок и текст обязательны")
             return
         }
 
@@ -212,7 +212,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                     Announcement(title = title.trim(), body = body.trim(), url = url.trim()),
                 )
                 _state.update { it.copy(sendingAnnouncement = false) }
-                _messages.emit("Delivered to ${result.delivered} devices")
+                _messages.emit("Доставлено на устройства: ${result.delivered}")
                 onSuccess()
                 loadStats()
             } catch (failure: ApiFailure) {
@@ -250,7 +250,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         if (failure is ApiFailure.Unauthorized) {
             sessionKey = null
             keyStore.clear()
-            _state.update { it.copy(auth = AuthState.Locked("Wrong key")) }
+            _state.update { it.copy(auth = AuthState.Locked("Неверный ключ")) }
         } else {
             keepScreen(failure.userMessage())
         }
@@ -262,10 +262,10 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private fun String.isMaintenanceOn(): Boolean = isNotBlank() && !equals("off", ignoreCase = true)
 
     private fun ApiFailure.userMessage(): String = when (this) {
-        is ApiFailure.Unauthorized -> "Wrong key"
-        is ApiFailure.BadRequest -> message ?: "Invalid request"
-        is ApiFailure.Unreachable -> "Server unreachable"
-        is ApiFailure.Server -> "Server error ($status)"
-        is ApiFailure.InvalidResponse -> "Invalid server response"
+        is ApiFailure.Unauthorized -> "Неверный ключ"
+        is ApiFailure.BadRequest -> message ?: "Некорректный запрос"
+        is ApiFailure.Unreachable -> "Сервер недоступен"
+        is ApiFailure.Server -> "Ошибка сервера ($status)"
+        is ApiFailure.InvalidResponse -> "Сервер вернул некорректный ответ"
     }
 }

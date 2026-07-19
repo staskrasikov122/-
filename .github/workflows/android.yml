@@ -1,4 +1,4 @@
-name: Android APK
+name: Сборка Android APK
 
 on:
   push:
@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   build:
+    name: Проверка и сборка
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -30,19 +31,19 @@ jobs:
 
       - uses: android-actions/setup-android@v4
 
-      - name: Install Android SDK
+      - name: Установка Android SDK
         run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Validate and build installable APK
+      - name: Проверка кода, тесты и сборка APK
         run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug --stacktrace
 
-      - name: Verify signature and prepare artifact
+      - name: Проверка подписи и подготовка артефакта
         shell: bash
         run: |
           set -euo pipefail
           version="$(sed -n 's/^ADMIN_VERSION_NAME=//p' gradle.properties | tail -n 1 | tr -d '\r')"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf '::error::Invalid ADMIN_VERSION_NAME: %s\n' "$version"
+            printf '::error::Некорректная ADMIN_VERSION_NAME: %s\n' "$version"
             exit 1
           fi
           apk="app/build/outputs/apk/debug/app-debug.apk"
@@ -59,6 +60,6 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-# TODO(release signing): add a separate signed release job after the owner creates
-# repository-scoped keystore secrets. Debug APK is installable and stable enough for
-# contract testing, but it must not be treated as the final signed release artifact.
+# TODO(release-подпись): добавить отдельную задачу после создания владельцем
+# репозиторных секретов хранилища ключей. Debug APK устанавливается и подходит для
+# проверки контракта, но не должен считаться окончательным release-артефактом.

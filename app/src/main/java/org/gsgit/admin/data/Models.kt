@@ -54,9 +54,9 @@ data class Announcement(
 data class AnnouncementResult(val delivered: Int)
 
 sealed class ApiFailure(message: String) : Exception(message) {
-    class Unauthorized : ApiFailure("Wrong key")
+    class Unauthorized : ApiFailure("Неверный ключ")
     class BadRequest(message: String) : ApiFailure(message)
-    class Unreachable : ApiFailure("Server unreachable")
-    class Server(val status: Int) : ApiFailure("Server error ($status)")
-    class InvalidResponse : ApiFailure("Invalid server response")
+    class Unreachable : ApiFailure("Сервер недоступен")
+    class Server(val status: Int) : ApiFailure("Ошибка сервера ($status)")
+    class InvalidResponse : ApiFailure("Сервер вернул некорректный ответ")
 }

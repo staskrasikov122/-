@@ -1,47 +1,47 @@
-# GsGit Admin
+# Админ GsGit
 
-Private Android control plane for `api.gsgit.org`. The app is intentionally limited to
-server administration and contains no end-user GsGit functionality.
+Приватный Android-пульт управления сервером `api.gsgit.org`. Приложение предназначено
+только для владельца и не содержит пользовательских функций обычного GsGit.
 
-## Features
+## Возможности
 
-- server-verified `X-Admin-Key` login;
-- Android Keystore-backed encrypted key storage;
-- live dashboard from `/admin/stats`;
-- kill-switch and update-gate configuration;
-- confirmed global push announcements;
-- searchable, expandable device inventory;
-- explicit GlassFiles placeholder pending its real API contract;
-- loading, empty, retry and human-readable error states.
+- вход по `X-Admin-Key` с обязательной проверкой на сервере;
+- зашифрованное хранение ключа через Android Keystore;
+- живая сводка из `/admin/stats`;
+- управление аварийной блокировкой, техработами и версиями;
+- массовые пуш-анонсы с обязательным подтверждением;
+- поиск и раскрывающийся список зарегистрированных устройств;
+- явная заглушка GlassFiles до получения настоящего контракта API;
+- состояния загрузки, пустых данных и ошибок с возможностью повтора.
 
-## Build
+## Сборка
 
 ```bash
 ./gradlew :app:assembleDebug
 ```
 
-The installable APK is produced at:
+Устанавливаемый APK появится здесь:
 
 ```text
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The repository workflow also builds and uploads that APK as a private Actions artifact.
+GitHub Actions также собирает APK и сохраняет его в приватном артефакте сборки.
 
-## Security
+## Безопасность
 
-- The admin key is never embedded in source code or logged.
-- The key is sent only to `https://api.gsgit.org` as `X-Admin-Key`.
-- App backup and device-transfer backup are disabled for encrypted preferences.
-- Authentication is authoritative on the server; the UI remains locked until
-  `GET /admin/stats` returns HTTP 200.
-- HTTP 401 clears the local key immediately.
+- Админ-ключ не встроен в исходный код и не записывается в логи.
+- Ключ отправляется только на `https://api.gsgit.org` в заголовке `X-Admin-Key`.
+- Резервное копирование и перенос зашифрованных настроек между устройствами отключены.
+- Решение об авторизации принимает только сервер. Панель остаётся заблокированной,
+  пока `GET /admin/stats` не вернёт HTTP 200.
+- При HTTP 401 локальная копия ключа немедленно удаляется.
 
-Release signing is intentionally not configured in source. Before producing a stable
-release build, add a private keystore and pass its path/password/alias through Gradle
-properties (`ADMIN_RELEASE_*`). Never commit signing material.
+Release-подпись намеренно не хранится в репозитории. Для постоянной подписи нужно
+передать путь, пароли и псевдоним ключа через Gradle-свойства `ADMIN_RELEASE_*`.
+Файл хранилища и его пароли нельзя добавлять в коммиты.
 
-## Artwork
+## Графика
 
-The original generated launcher artwork is stored at `artwork/gsgit-admin-icon.png`.
-JetBrains Mono is used under the SIL Open Font License 1.1.
+Оригинал сгенерированной иконки хранится в `artwork/gsgit-admin-icon.png`.
+Шрифт JetBrains Mono используется по лицензии SIL Open Font License 1.1.

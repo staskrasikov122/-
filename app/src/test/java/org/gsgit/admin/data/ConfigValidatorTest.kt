@@ -24,7 +24,7 @@ class ConfigValidatorTest {
             AppConfig(latestVersion = "1.85", minVersion = "1.0.0"),
         )
 
-        assertEquals("Latest version must use x.y.z", result)
+        assertEquals("Последняя версия должна быть в формате x.y.z", result)
     }
 
     @Test
@@ -37,6 +37,6 @@ class ConfigValidatorTest {
             ),
         )
 
-        assertEquals("Download URL must start with https:// or http://", result)
+        assertEquals("Ссылка на APK должна начинаться с https:// или http://", result)
     }
 }

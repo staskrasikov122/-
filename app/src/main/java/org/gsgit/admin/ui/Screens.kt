@@ -65,8 +65,8 @@ import org.gsgit.admin.ui.theme.TerminalSurface
 @Composable
 fun DashboardScreen(state: AdminUiState, viewModel: AdminViewModel) {
     when (val statsState = state.stats) {
-        LoadState.Idle, LoadState.Loading -> StatePanel("loading dashboard")
-        is LoadState.Error -> StatePanel(statsState.message, "RETRY", viewModel::loadStats)
+        LoadState.Idle, LoadState.Loading -> StatePanel("загрузка сводки")
+        is LoadState.Error -> StatePanel(statsState.message, "ПОВТОРИТЬ", viewModel::loadStats)
         is LoadState.Ready -> DashboardContent(statsState.value, state.togglingKillSwitch, viewModel)
     }
 }
@@ -87,24 +87,24 @@ private fun DashboardContent(
         contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { PageTitle("dashboard", "live server telemetry") }
+        item { PageTitle("обзор", "актуальное состояние сервера") }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("DEVICES", stats.devices.toString(), Modifier.weight(1f))
-                MetricCard("LOGINS", stats.logins.toString(), Modifier.weight(1f))
+                MetricCard("УСТРОЙСТВА", stats.devices.toString(), Modifier.weight(1f))
+                MetricCard("АККАУНТЫ", stats.logins.toString(), Modifier.weight(1f))
             }
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                MetricCard("QUIET HOURS ON", stats.quietEnabled.toString(), Modifier.weight(1f))
-                MetricCard("HELD PUSHES", stats.heldPushes.toString(), Modifier.weight(1f))
+                MetricCard("ТИХИЙ РЕЖИМ", stats.quietEnabled.toString(), Modifier.weight(1f))
+                MetricCard("ОТЛОЖЕНО", stats.heldPushes.toString(), Modifier.weight(1f))
             }
         }
         item {
             TerminalCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text("KILL-SWITCH", style = MaterialTheme.typography.labelLarge, color = TerminalMuted)
+                        Text("АВАРИЙНАЯ БЛОКИРОВКА", style = MaterialTheme.typography.labelLarge, color = TerminalMuted)
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Icon(
                                 if (maintenanceOn) Icons.Outlined.Warning else Icons.Outlined.CheckCircle,
@@ -112,7 +112,7 @@ private fun DashboardContent(
                                 tint = if (maintenanceOn) TerminalRed else TerminalGreen,
                             )
                             Text(
-                                if (maintenanceOn) "ON" else "OFF",
+                                if (maintenanceOn) "ВКЛЮЧЕНА" else "ВЫКЛЮЧЕНА",
                                 style = MaterialTheme.typography.headlineMedium,
                                 color = if (maintenanceOn) TerminalRed else TerminalGreen,
                             )
@@ -120,7 +120,7 @@ private fun DashboardContent(
                         if (maintenanceOn) {
                             Text(stats.maintenance, style = MaterialTheme.typography.bodyMedium)
                         } else {
-                            Text("clients are operating normally", style = MaterialTheme.typography.bodyMedium, color = TerminalMuted)
+                            Text("клиенты работают в обычном режиме", style = MaterialTheme.typography.bodyMedium, color = TerminalMuted)
                         }
                     }
                     Button(
@@ -132,18 +132,18 @@ private fun DashboardContent(
                         if (toggling) CircularProgressIndicator(Modifier.size(17.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Outlined.PowerSettingsNew, contentDescription = null)
                         Spacer(Modifier.width(7.dp))
-                        Text(if (maintenanceOn) "DISABLE" else "ENABLE")
+                        Text(if (maintenanceOn) "ОТКЛЮЧИТЬ" else "ВКЛЮЧИТЬ")
                     }
                 }
             }
         }
         item {
             TerminalCard {
-                Text("VERSION GATES", style = MaterialTheme.typography.labelLarge, color = TerminalMuted)
+                Text("ОГРАНИЧЕНИЯ ВЕРСИЙ", style = MaterialTheme.typography.labelLarge, color = TerminalMuted)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    VersionValue("latest", stats.latestVersion, Modifier.weight(1f))
-                    VersionValue("minimum", stats.minVersion, Modifier.weight(1f))
+                    VersionValue("последняя", stats.latestVersion, Modifier.weight(1f))
+                    VersionValue("минимальная", stats.minVersion, Modifier.weight(1f))
                 }
             }
         }
@@ -153,14 +153,14 @@ private fun DashboardContent(
         AlertDialog(
             onDismissRequest = { if (!toggling) showEnableDialog = false },
             icon = { Icon(Icons.Outlined.Warning, contentDescription = null, tint = TerminalRed) },
-            title = { Text("Enable kill-switch?") },
+            title = { Text("Включить блокировку?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("This locks every GsGit client. Enter the maintenance message shown to users.")
+                    Text("Действие заблокирует все клиенты GsGit. Введите сообщение, которое увидят пользователи.")
                     OutlinedTextField(
                         value = maintenanceMessage,
                         onValueChange = { maintenanceMessage = it },
-                        label = { Text("Maintenance message") },
+                        label = { Text("Сообщение о техработах") },
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -173,24 +173,24 @@ private fun DashboardContent(
                         viewModel.setMaintenance(maintenanceMessage)
                     },
                     enabled = maintenanceMessage.isNotBlank() && !toggling,
-                ) { Text("LOCK ALL CLIENTS") }
+                ) { Text("ЗАБЛОКИРОВАТЬ ВСЕХ") }
             },
-            dismissButton = { TextButton(onClick = { showEnableDialog = false }) { Text("CANCEL") } },
+            dismissButton = { TextButton(onClick = { showEnableDialog = false }) { Text("ОТМЕНА") } },
         )
     }
 
     if (showDisableDialog) {
         AlertDialog(
             onDismissRequest = { if (!toggling) showDisableDialog = false },
-            title = { Text("Disable kill-switch?") },
-            text = { Text("All clients will unlock after their next server check (within about one minute).") },
+            title = { Text("Отключить блокировку?") },
+            text = { Text("Все клиенты разблокируются после следующей проверки сервера — примерно в течение минуты.") },
             confirmButton = {
                 Button(onClick = {
                     showDisableDialog = false
                     viewModel.setMaintenance("")
-                }) { Text("UNLOCK CLIENTS") }
+                }) { Text("РАЗБЛОКИРОВАТЬ") }
             },
-            dismissButton = { TextButton(onClick = { showDisableDialog = false }) { Text("CANCEL") } },
+            dismissButton = { TextButton(onClick = { showDisableDialog = false }) { Text("ОТМЕНА") } },
         )
     }
 }
@@ -198,8 +198,8 @@ private fun DashboardContent(
 @Composable
 fun AppConfigScreen(state: AdminUiState, viewModel: AdminViewModel) {
     when (val configState = state.config) {
-        LoadState.Idle, LoadState.Loading -> StatePanel("loading app config")
-        is LoadState.Error -> StatePanel(configState.message, "RETRY", viewModel::loadConfig)
+        LoadState.Idle, LoadState.Loading -> StatePanel("загрузка настроек приложения")
+        is LoadState.Error -> StatePanel(configState.message, "ПОВТОРИТЬ", viewModel::loadConfig)
         is LoadState.Ready -> AppConfigForm(configState.value, state.savingConfig, viewModel::saveConfig)
     }
 }
@@ -220,47 +220,47 @@ private fun AppConfigForm(
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        PageTitle("app config", "update gates & maintenance")
+        PageTitle("настройки приложения", "обновления и технические работы")
         TerminalField(
             value = config.maintenanceSoon,
             onValueChange = { config = config.copy(maintenanceSoon = it) },
-            label = "Maintenance soon",
-            help = "Yellow warning banner. Empty means off.",
+            label = "Скоро техработы",
+            help = "Текст жёлтой плашки. Пустое поле — плашка выключена.",
             minLines = 2,
         )
         TerminalField(
             value = config.maintenance,
             onValueChange = { config = config.copy(maintenance = it) },
-            label = "Maintenance NOW",
-            help = "Full client lock. Empty means off. This is the kill-switch.",
+            label = "Техработы СЕЙЧАС",
+            help = "Полная блокировка клиентов. Пустое поле — блокировка выключена.",
             minLines = 3,
         )
         TerminalField(
             value = config.latestVersion,
             onValueChange = { config = config.copy(latestVersion = it) },
-            label = "Latest version",
-            help = "Soft update prompt. Format x.y.z.",
+            label = "Последняя версия",
+            help = "Мягкое предложение обновиться. Формат x.y.z.",
             keyboardType = KeyboardType.Decimal,
         )
         TerminalField(
             value = config.minVersion,
             onValueChange = { config = config.copy(minVersion = it) },
-            label = "Minimum version",
-            help = "Clients below this version are blocked. Format x.y.z.",
+            label = "Минимальная версия",
+            help = "Клиенты со старой версией будут заблокированы. Формат x.y.z.",
             keyboardType = KeyboardType.Decimal,
         )
         TerminalField(
             value = config.changelog,
             onValueChange = { config = config.copy(changelog = it) },
-            label = "Changelog",
-            help = "Multiline release notes shown to clients.",
+            label = "Что нового",
+            help = "Многострочное описание изменений для клиентов.",
             minLines = 5,
         )
         TerminalField(
             value = config.downloadUrl,
             onValueChange = { config = config.copy(downloadUrl = it) },
-            label = "Download URL",
-            help = "Destination for APK downloads.",
+            label = "Ссылка на APK",
+            help = "Адрес страницы или файла для загрузки обновления.",
             keyboardType = KeyboardType.Uri,
         )
         Button(
@@ -271,9 +271,9 @@ private fun AppConfigForm(
             if (saving) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(9.dp))
-                Text("SAVING")
+                Text("СОХРАНЕНИЕ")
             } else {
-                Text("SAVE CONFIG")
+                Text("СОХРАНИТЬ НАСТРОЙКИ")
             }
         }
         Spacer(Modifier.height(18.dp))
@@ -295,19 +295,20 @@ fun AnnounceScreen(state: AdminUiState, viewModel: AdminViewModel) {
             .padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        PageTitle("announce", "broadcast to every registered device")
+        PageTitle("рассылка", "сообщение всем зарегистрированным устройствам")
         TerminalCard {
-            Text("GLOBAL PUSH", style = MaterialTheme.typography.labelLarge, color = TerminalAmber)
+            Text("ОБЩАЯ ПУШ-РАССЫЛКА", style = MaterialTheme.typography.labelLarge, color = TerminalAmber)
             Spacer(Modifier.height(8.dp))
             Text(
-                recipientCount?.let { "$it registered devices" } ?: "recipient count unavailable — refresh stats",
+                recipientCount?.let { "Зарегистрировано устройств: $it" }
+                    ?: "Не удалось получить число получателей — обновите данные",
                 style = MaterialTheme.typography.bodyMedium,
                 color = TerminalMuted,
             )
         }
-        TerminalField(title, { title = it }, "Title", "Required")
-        TerminalField(body, { body = it }, "Text", "Required", minLines = 5)
-        TerminalField(url, { url = it }, "URL", "Optional notification destination", keyboardType = KeyboardType.Uri)
+        TerminalField(title, { title = it }, "Заголовок", "Обязательное поле")
+        TerminalField(body, { body = it }, "Текст", "Обязательное поле", minLines = 5)
+        TerminalField(url, { url = it }, "URL", "Необязательная ссылка из уведомления", keyboardType = KeyboardType.Uri)
         Button(
             onClick = { confirm = true },
             enabled = !state.sendingAnnouncement && title.isNotBlank() && body.isNotBlank() && recipientCount != null,
@@ -316,9 +317,9 @@ fun AnnounceScreen(state: AdminUiState, viewModel: AdminViewModel) {
             if (state.sendingAnnouncement) {
                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 Spacer(Modifier.width(9.dp))
-                Text("SENDING")
+                Text("ОТПРАВКА")
             } else {
-                Text("SEND TO ALL")
+                Text("ОТПРАВИТЬ ВСЕМ")
             }
         }
     }
@@ -327,10 +328,10 @@ fun AnnounceScreen(state: AdminUiState, viewModel: AdminViewModel) {
         AlertDialog(
             onDismissRequest = { if (!state.sendingAnnouncement) confirm = false },
             icon = { Icon(Icons.Outlined.Warning, contentDescription = null, tint = TerminalAmber) },
-            title = { Text("Send to $recipientCount devices?") },
+            title = { Text("Отправить на $recipientCount устройств?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("This push announcement is sent to every registered device.")
+                    Text("Пуш-анонс будет отправлен на каждое зарегистрированное устройство.")
                     Text(title, fontWeight = FontWeight.Bold)
                     Text(body, color = TerminalMuted)
                 }
@@ -346,9 +347,9 @@ fun AnnounceScreen(state: AdminUiState, viewModel: AdminViewModel) {
                         }
                     },
                     enabled = !state.sendingAnnouncement,
-                ) { Text("CONFIRM SEND") }
+                ) { Text("ПОДТВЕРДИТЬ") }
             },
-            dismissButton = { TextButton(onClick = { confirm = false }) { Text("CANCEL") } },
+            dismissButton = { TextButton(onClick = { confirm = false }) { Text("ОТМЕНА") } },
         )
     }
 }
@@ -356,8 +357,8 @@ fun AnnounceScreen(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 fun DevicesScreen(state: LoadState<DevicesResponse>, retry: () -> Unit) {
     when (state) {
-        LoadState.Idle, LoadState.Loading -> StatePanel("loading devices")
-        is LoadState.Error -> StatePanel(state.message, "RETRY", retry)
+        LoadState.Idle, LoadState.Loading -> StatePanel("загрузка устройств")
+        is LoadState.Error -> StatePanel(state.message, "ПОВТОРИТЬ", retry)
         is LoadState.Ready -> DevicesContent(state.value)
     }
 }
@@ -379,19 +380,19 @@ private fun DevicesContent(response: DevicesResponse) {
         contentPadding = androidx.compose.foundation.layout.PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { PageTitle("devices", "${response.logins} logins / ${response.totalDevices} devices") }
+        item { PageTitle("устройства", "аккаунтов: ${response.logins} / устройств: ${response.totalDevices}") }
         item {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                label = { Text("Search login or device") },
+                label = { Text("Поиск по аккаунту или устройству") },
                 leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
         if (filtered.isEmpty()) {
-            item { EmptyCard(if (response.devices.isEmpty()) "No registered devices" else "No matching devices") }
+            item { EmptyCard(if (response.devices.isEmpty()) "Зарегистрированных устройств нет" else "Ничего не найдено") }
         } else {
             items(filtered, key = { it.login }) { group ->
                 DeviceGroupCard(
@@ -418,7 +419,7 @@ private fun DeviceGroupCard(group: DeviceGroup, expanded: Boolean, onToggle: () 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("@${group.login}", style = MaterialTheme.typography.titleMedium)
-                    Text("${group.count} registered", style = MaterialTheme.typography.labelMedium, color = TerminalMuted)
+                    Text("зарегистрировано: ${group.count}", style = MaterialTheme.typography.labelMedium, color = TerminalMuted)
                 }
                 Icon(if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore, contentDescription = null)
             }
@@ -439,26 +440,26 @@ private fun DeviceGroupCard(group: DeviceGroup, expanded: Boolean, onToggle: () 
 private fun DeviceDetails(device: AdminDevice) {
     Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
         Text(device.name, style = MaterialTheme.typography.titleMedium, color = TerminalGreen)
-        DetailLine("timezone", formatTimezone(device.tzOffsetMin))
+        DetailLine("часовой пояс", formatTimezone(device.tzOffsetMin))
         DetailLine(
-            "quiet hours",
-            device.quietHours?.let { "%02d:00–%02d:00".format(it.start, it.end) } ?: "off",
+            "тихие часы",
+            device.quietHours?.let { "%02d:00–%02d:00".format(it.start, it.end) } ?: "выключены",
         )
-        DetailLine("held pushes", device.heldCount.toString())
-        DetailLine("token tail", "••••••${device.tokenTail}")
+        DetailLine("отложено", device.heldCount.toString())
+        DetailLine("хвост токена", "••••••${device.tokenTail}")
     }
 }
 
 @Composable
 fun GlassFilesPlaceholder() {
-    // TODO(GlassFiles API contract): replace this explicit placeholder only after the owner provides the real contract.
+    // TODO(контракт API GlassFiles): заменить заглушку только после получения реального контракта от владельца.
     Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
         TerminalCard(modifier = Modifier.fillMaxWidth()) {
             Text("[ GlassFiles ]", style = MaterialTheme.typography.headlineMedium, color = TerminalGreen)
             Spacer(Modifier.height(12.dp))
-            Text("paste GlassFiles API contract here", color = TerminalMuted)
+            Text("Здесь будет контракт API GlassFiles", color = TerminalMuted)
             Spacer(Modifier.height(7.dp))
-            Text("No endpoints have been invented or called.", style = MaterialTheme.typography.bodyMedium)
+            Text("Вымышленные эндпоинты не добавлены и не вызываются.", style = MaterialTheme.typography.bodyMedium)
         }
     }
 }

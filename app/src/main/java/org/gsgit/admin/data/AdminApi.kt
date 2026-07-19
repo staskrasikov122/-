@@ -145,7 +145,7 @@ class AdminApi(
 
             when (status) {
                 in 200..299 -> response
-                400 -> throw ApiFailure.BadRequest(readError(response) ?: "Invalid request")
+                400 -> throw ApiFailure.BadRequest(readError(response) ?: "Некорректный запрос")
                 401 -> throw ApiFailure.Unauthorized()
                 else -> throw ApiFailure.Server(status)
             }
@@ -161,7 +161,12 @@ class AdminApi(
     }
 
     private fun readError(raw: String): String? = try {
-        JSONObject(raw).optString("error").takeIf { it.isNotBlank() }
+        when (val error = JSONObject(raw).optString("error").takeIf { it.isNotBlank() }) {
+            "bad json" -> "Некорректные данные запроса"
+            "title and body required" -> "Заголовок и текст обязательны"
+            "bad admin key" -> "Неверный ключ"
+            else -> error
+        }
     } catch (_: JSONException) {
         null
     }

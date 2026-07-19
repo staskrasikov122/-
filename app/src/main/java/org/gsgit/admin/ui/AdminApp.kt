@@ -72,7 +72,7 @@ fun AdminApp(viewModel: AdminViewModel) {
 
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when (val auth = state.auth) {
-            AuthState.Restoring -> FullScreenLoader("restoring secure session")
+            AuthState.Restoring -> FullScreenLoader("восстановление защищённой сессии")
             is AuthState.Locked -> LockScreen(
                 error = auth.error,
                 checking = false,
@@ -115,8 +115,8 @@ private fun LockScreen(
             modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            Text("[ GsGit Admin ]", style = MaterialTheme.typography.headlineMedium, color = TerminalGreen)
-            Text("control plane locked", style = MaterialTheme.typography.bodyMedium, color = TerminalMuted)
+            Text("[ Админ GsGit ]", style = MaterialTheme.typography.headlineMedium, color = TerminalGreen)
+            Text("панель управления заблокирована", style = MaterialTheme.typography.bodyMedium, color = TerminalMuted)
             OutlinedTextField(
                 value = key,
                 onValueChange = { if (!checking) key = it },
@@ -138,9 +138,9 @@ private fun LockScreen(
                 if (checking) {
                     CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                     Spacer(Modifier.width(10.dp))
-                    Text("VERIFYING")
+                    Text("ПРОВЕРКА")
                 } else {
-                    Text("UNLOCK")
+                    Text("РАЗБЛОКИРОВАТЬ")
                 }
             }
         }
@@ -214,16 +214,16 @@ private fun AdminTopBar(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("> server admin", style = MaterialTheme.typography.titleLarge)
+                    Text("> админ сервера", style = MaterialTheme.typography.titleLarge)
                     Text("api.gsgit.org", style = MaterialTheme.typography.labelMedium, color = TerminalMuted)
                 }
                 IconButton(onClick = onRefresh, enabled = backend == Backend.GsGit) {
-                    Icon(Icons.Outlined.Refresh, contentDescription = "Refresh")
+                    Icon(Icons.Outlined.Refresh, contentDescription = "Обновить")
                 }
                 TextButton(onClick = onLock) {
                     Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(17.dp))
                     Spacer(Modifier.width(7.dp))
-                    Text("LOCK")
+                    Text("ЗАБЛОКИРОВАТЬ")
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -246,10 +246,10 @@ private data class NavigationItem(
 )
 
 private val navigationItems = listOf(
-    NavigationItem(Section.Dashboard, "Dashboard", Icons.Outlined.Dashboard),
-    NavigationItem(Section.AppConfig, "Config", Icons.Outlined.Settings),
-    NavigationItem(Section.Announce, "Announce", Icons.Outlined.Campaign),
-    NavigationItem(Section.Devices, "Devices", Icons.Outlined.Devices),
+    NavigationItem(Section.Dashboard, "Обзор", Icons.Outlined.Dashboard),
+    NavigationItem(Section.AppConfig, "Настройки", Icons.Outlined.Settings),
+    NavigationItem(Section.Announce, "Рассылка", Icons.Outlined.Campaign),
+    NavigationItem(Section.Devices, "Устройства", Icons.Outlined.Devices),
 )
 
 @Composable
