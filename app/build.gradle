@@ -79,6 +79,11 @@ dependencies {
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
 
+    // Tink references these source annotations. Keeping them on the compile
+    // classpath lets R8 verify release builds without packaging extra code.
+    compileOnly 'com.google.errorprone:error_prone_annotations:2.36.0'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+
     testImplementation 'junit:junit:4.13.2'
     debugImplementation 'androidx.compose.ui:ui-tooling'
     debugImplementation 'androidx.compose.ui:ui-test-manifest'
