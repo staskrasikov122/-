@@ -44,14 +44,14 @@ private val AdminColors = darkColorScheme(
 )
 
 private val AdminTypography = Typography(
-    displaySmall = TextStyle(JetBrainsMono, FontWeight.Bold, fontSize = 32.sp, lineHeight = 38.sp),
-    headlineMedium = TextStyle(JetBrainsMono, FontWeight.Bold, fontSize = 23.sp, lineHeight = 30.sp),
-    titleLarge = TextStyle(JetBrainsMono, FontWeight.Bold, fontSize = 18.sp, lineHeight = 24.sp),
-    titleMedium = TextStyle(JetBrainsMono, FontWeight.Medium, fontSize = 15.sp, lineHeight = 21.sp),
-    bodyLarge = TextStyle(JetBrainsMono, FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp),
-    bodyMedium = TextStyle(JetBrainsMono, FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp),
-    labelLarge = TextStyle(JetBrainsMono, FontWeight.Bold, fontSize = 13.sp, lineHeight = 18.sp),
-    labelMedium = TextStyle(JetBrainsMono, FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp),
+    displaySmall = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 38.sp),
+    headlineMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 23.sp, lineHeight = 30.sp),
+    titleLarge = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 24.sp),
+    titleMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 21.sp),
+    bodyLarge = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp),
+    bodyMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp),
+    labelLarge = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 13.sp, lineHeight = 18.sp),
+    labelMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp),
 )
 
 @Composable
