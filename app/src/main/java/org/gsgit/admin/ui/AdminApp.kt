@@ -22,6 +22,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Campaign
+import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Lock
@@ -185,10 +186,11 @@ private fun AdminShell(
                         GlassFilesPlaceholder()
                     } else {
                         when (state.section) {
-                            Section.Dashboard -> DashboardScreen(state, viewModel)
-                            Section.AppConfig -> AppConfigScreen(state, viewModel)
-                            Section.Announce -> AnnounceScreen(state, viewModel)
-                            Section.Devices -> DevicesScreen(state.devices, viewModel::loadDevices)
+                            Section.Dashboard -> DashboardV2Screen(state, viewModel)
+                            Section.AppConfig -> AppConfigV2Screen(state, viewModel)
+                            Section.Announce -> AnnounceV2Screen(state, viewModel)
+                            Section.Devices -> DevicesV2Screen(state, viewModel)
+                            Section.Operations -> OperationsScreen(state, viewModel)
                         }
                     }
                 }
@@ -250,6 +252,7 @@ private val navigationItems = listOf(
     NavigationItem(Section.AppConfig, "Настройки", Icons.Outlined.Settings),
     NavigationItem(Section.Announce, "Рассылка", Icons.Outlined.Campaign),
     NavigationItem(Section.Devices, "Устройства", Icons.Outlined.Devices),
+    NavigationItem(Section.Operations, "Операции", Icons.Outlined.Build),
 )
 
 @Composable
