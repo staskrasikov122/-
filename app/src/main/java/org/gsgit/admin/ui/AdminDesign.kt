@@ -67,6 +67,7 @@ import org.gsgit.admin.ui.kyant.utils.InteractiveHighlight
 import org.gsgit.admin.ui.kyant.utils.LiquidMotion
 import org.gsgit.admin.ui.kyant.utils.liquidClickable
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
+import org.gsgit.admin.ui.liquid.LocalLiquidSceneBackdrop
 import org.gsgit.admin.ui.liquid.RegisterLiquidOverlay
 import org.gsgit.admin.ui.theme.AdminFont
 import org.gsgit.admin.ui.theme.AdminTheme
@@ -269,7 +270,9 @@ private fun AdminGlassCapsule(
     Row(
         modifier
             .drawBackdrop(
-                backdrop = LocalLiquidBackdrop.current,
+                // Слой сцены (обои): внутри карточки её собственный слой однотонный,
+                // и линза на нём не видна — а на обоях кнопка выглядит как блок.
+                backdrop = LocalLiquidSceneBackdrop.current,
                 shape = { Capsule() },
                 // Тот же рецепт стекла, что у блоков (AdminCard): кнопки выглядят
                 // как мини-панели, все параметры из группы «Панели».
@@ -407,7 +410,7 @@ fun AdminIconAction(
     active: Boolean = false,
 ) {
     val colors = AdminTheme.colors
-    val backdrop = LocalLiquidBackdrop.current
+    val backdrop = LocalLiquidSceneBackdrop.current
     val tint = colors.accent
     Box(
         modifier
@@ -524,7 +527,7 @@ fun AdminCheckRow(label: String, checked: Boolean, onToggle: () -> Unit, descrip
 @Composable
 fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = false, onClick: (() -> Unit)? = null) {
     val colors = AdminTheme.colors
-    val backdrop = LocalLiquidBackdrop.current
+    val backdrop = LocalLiquidSceneBackdrop.current
     val tint = when {
         destructive -> colors.error
         selected -> colors.accent

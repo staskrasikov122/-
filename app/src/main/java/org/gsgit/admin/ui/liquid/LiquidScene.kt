@@ -37,6 +37,16 @@ val LocalLiquidBackdrop = compositionLocalOf<Backdrop> {
     error("Liquid Glass component used outside LiquidScene")
 }
 
+/**
+ * Слой сцены (обои) — никогда не переопределяется карточками. Нажимные
+ * контролы преломляют его напрямую, чтобы выглядеть как мини-панели даже
+ * внутри карточек: слой карточки под ними однотонный, и линза на нём
+ * "не видна".
+ */
+val LocalLiquidSceneBackdrop = compositionLocalOf<Backdrop> {
+    error("Liquid Glass component used outside LiquidScene")
+}
+
 class LiquidOverlayState internal constructor() {
     internal var entry by mutableStateOf<LiquidOverlayEntry?>(null)
 }
@@ -63,6 +73,7 @@ fun LiquidScene(
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalLiquidBackdrop provides backdrop,
+        LocalLiquidSceneBackdrop provides backdrop,
         LocalLiquidOverlay provides overlayState,
     ) {
         Box(Modifier.fillMaxSize().background(Color(0xFF0E0508))) {
