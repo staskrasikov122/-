@@ -12,7 +12,7 @@
 - лицензия: Apache License 2.0.
 
 С сохранением исходной реализации перенесены `LiquidButton`, `LiquidToggle`,
-`LiquidBottomTabs`, `LiquidBottomTab`, `InteractiveHighlight`,
+`LiquidBottomTabs`, `LiquidBottomTab`, `LiquidSlider`, `InteractiveHighlight`,
 `DampedDragAnimation`, `DragGestureInspector` и Android-обёртка `awaitFrame`.
 Изменены namespace/import для обычного Android-модуля, а также смягчены
 константы анимаций (жёсткость пружин в `DampedDragAnimation`, масштаб нажатия

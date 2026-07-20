@@ -26,6 +26,7 @@ import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import org.gsgit.admin.data.GlassSettingsStore
 import org.gsgit.admin.ui.liquid.LiquidScene
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
@@ -56,24 +57,27 @@ fun AdminApp(viewModel: AdminViewModel) {
         }
     }
 
-    LiquidScene {
-        when (val auth = state.auth) {
-            AuthState.Restoring -> CenterStatus("восстановление защищённой сессии")
-            is AuthState.Locked -> AdminKeyScreen(auth.error, false, viewModel::unlock)
-            AuthState.Checking -> AdminKeyScreen(null, true, viewModel::unlock)
-            is AuthState.BiometricRequired -> BiometricScreen(
-                error = auth.error,
-                onSuccess = viewModel::completeBiometricAuthentication,
-                onFailure = viewModel::biometricFailed,
-                onUseKey = viewModel::useAdminKeyInstead,
-            )
-            AuthState.Unlocked -> AdminShell(state, viewModel)
-        }
-        toast?.let { message ->
-            AdminToast(
-                message,
-                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 104.dp),
-            )
+    val glass by GlassSettingsStore.state
+    CompositionLocalProvider(LocalGlassSettings provides glass) {
+        LiquidScene(wallpaperRes = AdminWallpapers.resFor(glass.wallpaper)) {
+            when (val auth = state.auth) {
+                AuthState.Restoring -> CenterStatus("восстановление защищённой сессии")
+                is AuthState.Locked -> AdminKeyScreen(auth.error, false, viewModel::unlock)
+                AuthState.Checking -> AdminKeyScreen(null, true, viewModel::unlock)
+                is AuthState.BiometricRequired -> BiometricScreen(
+                    error = auth.error,
+                    onSuccess = viewModel::completeBiometricAuthentication,
+                    onFailure = viewModel::biometricFailed,
+                    onUseKey = viewModel::useAdminKeyInstead,
+                )
+                AuthState.Unlocked -> AdminShell(state, viewModel)
+            }
+            toast?.let { message ->
+                AdminToast(
+                    message,
+                    Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 104.dp),
+                )
+            }
         }
     }
 }

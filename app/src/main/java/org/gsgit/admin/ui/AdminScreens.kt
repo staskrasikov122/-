@@ -1,6 +1,8 @@
 package org.gsgit.admin.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -13,11 +15,18 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kyant.shapes.RoundedRectangle
 import org.gsgit.admin.data.*
+import org.gsgit.admin.ui.kyant.components.LiquidSlider
+import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 
 @Composable
@@ -323,7 +332,7 @@ private fun TestPushDialogV3(device: AdminDevice, onDismiss: () -> Unit, onSend:
     }
 }
 
-private enum class OperationsTab(val label: String) { Maintenance("техработы"), Releases("релизы"), Audit("аудит"), Errors("ошибки"), Security("защита") }
+private enum class OperationsTab(val label: String) { Maintenance("техработы"), Releases("релизы"), Audit("аудит"), Errors("ошибки"), Security("защита"), Glass("стекло") }
 
 @Composable
 fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
@@ -341,6 +350,7 @@ fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
             OperationsTab.Audit -> AuditPanelV3(state, viewModel)
             OperationsTab.Errors -> ErrorsPanelV3(state, viewModel)
             OperationsTab.Security -> SecurityPanelV3(state, viewModel)
+            OperationsTab.Glass -> GlassPanelV3()
         }
     }
 }
@@ -456,6 +466,90 @@ private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
         }
     }
     if (logoutConfirm) TypedConfirmationDialog("удалить сохранённый ключ", "Для следующего входа потребуется полный X-Admin-Key.", "ВЫЙТИ", { logoutConfirm = false; viewModel.logout() }, { logoutConfirm = false })
+}
+
+// ═══ Настройка стекла: все параметры backdrop + выбор обоев ═══
+
+@Composable
+private fun GlassPanelV3() {
+    val glass = LocalGlassSettings.current
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AdminCard {
+            AdminSectionLabel("обои")
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminWallpapers.items.forEachIndexed { index, res ->
+                    val selected = glass.wallpaper == index
+                    Image(
+                        painterResource(res),
+                        contentDescription = "обои ${index + 1}",
+                        modifier = Modifier
+                            .size(72.dp, 126.dp)
+                            .clip(RoundedRectangle(16.dp))
+                            .border(
+                                if (selected) 2.dp else 1.dp,
+                                if (selected) AdminTheme.colors.accent else Color.White.copy(alpha = 0.2f),
+                                RoundedRectangle(16.dp),
+                            )
+                            .clickable { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaper = index)) },
+                        contentScale = ContentScale.Crop,
+                    )
+                }
+            }
+        }
+        AdminCard {
+            AdminSectionLabel("панели")
+            Spacer(Modifier.height(6.dp))
+            GlassSlider("радиус углов", "%.0f dp", 8f..48f, { GlassSettingsStore.state.value.cardCornerRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardCornerRadius = it)) }
+            GlassSlider("размытие", "%.0f dp", 0f..32f, { GlassSettingsStore.state.value.cardBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardBlur = it)) }
+            GlassSlider("плотность заливки", "%.2f", 0f..0.8f, { GlassSettingsStore.state.value.cardSurfaceAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardSurfaceAlpha = it)) }
+            GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.refractionHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionHeight = it)) }
+            GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.refractionAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionAmount = it)) }
+            GlassSlider("яркость", "%.2f", -0.5f..0.5f, { GlassSettingsStore.state.value.brightness }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(brightness = it)) }
+            GlassSlider("насыщенность", "%.2f", 0f..2f, { GlassSettingsStore.state.value.saturation }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(saturation = it)) }
+            AdminCheckRow("Глубина линзы", glass.depthEffect, { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(depthEffect = !glass.depthEffect)) })
+            AdminCheckRow("Хроматическая аберрация", glass.chromaticAberration, { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(chromaticAberration = !glass.chromaticAberration)) })
+            AdminCheckRow("Вибранс", glass.vibrancy, { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(vibrancy = !glass.vibrancy)) })
+        }
+        AdminCard {
+            AdminSectionLabel("кнопки и чипы")
+            Spacer(Modifier.height(6.dp))
+            GlassSlider("плотность цвета", "%.2f", 0.2f..1f, { GlassSettingsStore.state.value.tintAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintAlpha = it)) }
+            GlassSlider("внешняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadow = it)) }
+            GlassSlider("внутренняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlInnerShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerShadow = it)) }
+            GlassSlider("окантовка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.controlStroke }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlStroke = it)) }
+        }
+        AdminCard {
+            AdminSectionLabel("нижний бар")
+            Spacer(Modifier.height(6.dp))
+            GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.barLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensHeight = it)) }
+            GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.barLensAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensAmount = it)) }
+            GlassSlider("тонировка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.barSurfaceAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barSurfaceAlpha = it)) }
+        }
+        AdminCard {
+            AdminSectionLabel("кромки экрана")
+            Spacer(Modifier.height(6.dp))
+            GlassSlider("размытие кромок", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.edgeBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeBlur = it)) }
+        }
+        AdminPillButton("сбросить настройки стекла", { GlassSettingsStore.reset() }, Modifier.fillMaxWidth(), accent = false)
+    }
+}
+
+@Composable
+private fun GlassSlider(label: String, format: String, range: ClosedFloatingPointRange<Float>, value: () -> Float, onChange: (Float) -> Unit) {
+    Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            AdminText(label, color = AdminTheme.colors.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            AdminText(format.format(value()), fontSize = 12.sp)
+        }
+        LiquidSlider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = range,
+            visibilityThreshold = 0.001f,
+            backdrop = LocalLiquidBackdrop.current,
+        )
+    }
 }
 
 @Composable

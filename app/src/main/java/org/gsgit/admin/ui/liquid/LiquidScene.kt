@@ -52,7 +52,10 @@ val LocalLiquidOverlay = compositionLocalOf<LiquidOverlayState> {
 }
 
 @Composable
-fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
+fun LiquidScene(
+    wallpaperRes: Int = R.drawable.admin_wallpaper,
+    content: @Composable BoxScope.() -> Unit,
+) {
     val backdrop = rememberLayerBackdrop()
     val overlayState = remember { LiquidOverlayState() }
 
@@ -62,7 +65,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
     ) {
         Box(Modifier.fillMaxSize().background(Color(0xFF0E0508))) {
             // Source and consumers are siblings. This ordering is intentional and mandatory.
-            LiquidSceneBackground(Modifier.fillMaxSize().layerBackdrop(backdrop))
+            LiquidSceneBackground(wallpaperRes, Modifier.fillMaxSize().layerBackdrop(backdrop))
             content()
             overlayState.entry?.let { entry ->
                 BackHandler(enabled = entry.dismissOnBack, onBack = entry.onDismiss)
@@ -84,10 +87,10 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
 }
 
 @Composable
-private fun LiquidSceneBackground(modifier: Modifier = Modifier) {
+private fun LiquidSceneBackground(wallpaperRes: Int, modifier: Modifier = Modifier) {
     // Обои без скрима — как в каталоге Kyant: стеклу нужен живой фон.
     Image(
-        painter = painterResource(R.drawable.admin_wallpaper),
+        painter = painterResource(wallpaperRes),
         contentDescription = null,
         modifier = modifier,
         contentScale = ContentScale.Crop,
