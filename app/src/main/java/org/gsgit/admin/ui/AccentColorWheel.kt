@@ -35,6 +35,7 @@ import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.min
 import kotlin.math.sin
 
 /**
@@ -65,7 +66,8 @@ fun AccentColorWheel(
                 .size(220.dp)
                 .pointerInput(Unit) {
                     fun pick(pos: Offset) {
-                        val r = size.minDimension / 2f
+                        // size здесь — IntSize (PointerInputScope), у него нет minDimension
+                        val r = min(size.width, size.height) / 2f
                         val dx = pos.x - size.width / 2f
                         val dy = pos.y - size.height / 2f
                         hue = (Math.toDegrees(atan2(dy, dx).toDouble()).toFloat() + 360f) % 360f
