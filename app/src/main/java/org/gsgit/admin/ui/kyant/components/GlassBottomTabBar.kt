@@ -44,7 +44,6 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +65,7 @@ import com.kyant.shapes.Capsule
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import org.gsgit.admin.data.GlassSettingsStore
 import org.gsgit.admin.ui.kyant.utils.DampedDragAnimation
 import org.gsgit.admin.ui.kyant.utils.InteractiveHighlight
 import org.gsgit.admin.ui.theme.AdminFont
@@ -92,11 +92,7 @@ fun GlassBottomTabBar(
     onTabSelected: (Int) -> Unit,
     tabs: List<GlassTabItem>,
     modifier: Modifier = Modifier,
-    lensHeight: Dp = 32.dp,
-    lensAmount: Dp = 48.dp,
-    surfaceAlpha: Float = 0.13f,
 ) {
-    val containerColor = Color.Black.copy(alpha = surfaceAlpha)
     val tabsBackdrop = rememberLayerBackdrop()
 
     Box(modifier.fillMaxWidth().padding(bottom = 20.dp), contentAlignment = Alignment.BottomCenter) {
@@ -158,12 +154,13 @@ fun GlassBottomTabBar(
             Row(
                 Modifier.graphicsLayer { translationX = panelOffset }
                     .drawBackdrop(backdrop = backdrop, shape = { Capsule() },
-                        effects = { vibrancy(); blur(2f.dp.toPx()); lens(lensHeight.toPx(), lensAmount.toPx(), chromaticAberration = true) },
+                        // Параметры стекла читаются в draw-фазе: живой предпросмотр без рекомпозиций.
+                        effects = { val g = GlassSettingsStore.state.value; vibrancy(); blur(2f.dp.toPx()); lens(g.barLensHeight.dp.toPx(), g.barLensAmount.dp.toPx(), chromaticAberration = true) },
                         highlight = { Highlight.Ambient },
                         shadow = { Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.25f)) },
                         innerShadow = { InnerShadow(radius = 6.dp, alpha = 0.35f) },
                         layerBlock = { val p = dampedDragAnimation.pressProgress; val s = lerp(1f, 1f + 16f.dp.toPx() / size.width, p); scaleX = s; scaleY = s },
-                        onDrawSurface = { drawRect(containerColor) }
+                        onDrawSurface = { drawRect(Color.Black.copy(alpha = GlassSettingsStore.state.value.barSurfaceAlpha)) }
                     ).then(interactiveHighlight.modifier).height(BarHeight).fillMaxWidth().padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) { tabs.forEachIndexed { i, tab -> GlassTab { TabContent(tab, i == selectedTab) } } }
@@ -173,9 +170,9 @@ fun GlassBottomTabBar(
                 Modifier.clearAndSetSemantics {}.alpha(0f).layerBackdrop(tabsBackdrop)
                     .graphicsLayer { translationX = panelOffset }
                     .drawBackdrop(backdrop = backdrop, shape = { Capsule() },
-                        effects = { val p = dampedDragAnimation.pressProgress; vibrancy(); blur(2f.dp.toPx()); lens(lensHeight.toPx() * p, lensHeight.toPx() * p) },
+                        effects = { val p = dampedDragAnimation.pressProgress; val h = GlassSettingsStore.state.value.barLensHeight.dp.toPx(); vibrancy(); blur(2f.dp.toPx()); lens(h * p, h * p) },
                         highlight = { Highlight.Default.copy(alpha = dampedDragAnimation.pressProgress) },
-                        onDrawSurface = { drawRect(containerColor) }
+                        onDrawSurface = { drawRect(Color.Black.copy(alpha = GlassSettingsStore.state.value.barSurfaceAlpha)) }
                     ).then(interactiveHighlight.modifier).height(CapsuleHeight).fillMaxWidth().padding(horizontal = 4.dp)
                     .graphicsLayer(colorFilter = ColorFilter.tint(AccentColor)),
                 verticalAlignment = Alignment.CenterVertically

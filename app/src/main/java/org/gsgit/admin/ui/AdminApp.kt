@@ -21,10 +21,14 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.gsgit.admin.data.GlassSettingsStore
 import org.gsgit.admin.ui.liquid.LiquidScene
+import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 
 @Composable
@@ -53,27 +57,27 @@ fun AdminApp(viewModel: AdminViewModel) {
         }
     }
 
-    val glass by GlassSettingsStore.state
-    CompositionLocalProvider(LocalGlassSettings provides glass) {
-        LiquidScene(wallpaperRes = AdminWallpapers.resFor(glass.wallpaper)) {
-            when (val auth = state.auth) {
-                AuthState.Restoring -> CenterStatus("восстановление защищённой сессии")
-                is AuthState.Locked -> AdminKeyScreen(auth.error, false, viewModel::unlock)
-                AuthState.Checking -> AdminKeyScreen(null, true, viewModel::unlock)
-                is AuthState.BiometricRequired -> BiometricScreen(
-                    error = auth.error,
-                    onSuccess = viewModel::completeBiometricAuthentication,
-                    onFailure = viewModel::biometricFailed,
-                    onUseKey = viewModel::useAdminKeyInstead,
-                )
-                AuthState.Unlocked -> AdminShell(state, viewModel)
-            }
-            toast?.let { message ->
-                AdminToast(
-                    message,
-                    Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 104.dp),
-                )
-            }
+    // derivedStateOf: рекомпозиция только при смене ОБОЕВ, а не любого
+    // параметра стекла (те читаются в draw-фазе и сюда не долетают).
+    val wallpaper by remember { derivedStateOf { GlassSettingsStore.state.value.wallpaper } }
+    LiquidScene(wallpaperRes = AdminWallpapers.resFor(wallpaper)) {
+        when (val auth = state.auth) {
+            AuthState.Restoring -> CenterStatus("восстановление защищённой сессии")
+            is AuthState.Locked -> AdminKeyScreen(auth.error, false, viewModel::unlock)
+            AuthState.Checking -> AdminKeyScreen(null, true, viewModel::unlock)
+            is AuthState.BiometricRequired -> BiometricScreen(
+                error = auth.error,
+                onSuccess = viewModel::completeBiometricAuthentication,
+                onFailure = viewModel::biometricFailed,
+                onUseKey = viewModel::useAdminKeyInstead,
+            )
+            AuthState.Unlocked -> AdminShell(state, viewModel)
+        }
+        toast?.let { message ->
+            AdminToast(
+                message,
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 104.dp),
+            )
         }
     }
 }
@@ -194,37 +198,45 @@ private val adminNavigation = listOf(
 
 @Composable
 private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
-    // Правило LiquidGlassKit: стекло хрома стоит над ПРОСТЫМ фоном (обоями),
-    // а не над другим стеклом. Контент не захватывается в отдельный слой —
-    // это убирает дорогой полноэкранный захват на каждый кадр.
+    val sceneBackdrop = LocalLiquidBackdrop.current
+    val contentLayer = rememberLayerBackdrop()
+    // Хром (бар и кромки) преломляет и размывает не только обои, но и
+    // проезжающий под ним контент: сцена + слой контента. Настройки стекла
+    // при этом читаются в draw-фазе, так что рекомпозиций на кадр нет.
+    val chromeBackdrop = rememberCombinedBackdrop(sceneBackdrop, contentLayer)
     Box(Modifier.fillMaxSize()) {
         // Контент во весь экран: списки проезжают под шапкой и баром
-        // (adminScreenPadding даёт им вставки). Хром ниже — сиблинги.
-        if (state.backend == Backend.GlassFiles) {
-            GlassFilesPlaceholderV3()
-        } else {
-            when (state.section) {
-                Section.Dashboard -> DashboardV3Screen(state, viewModel)
-                Section.AppConfig -> AppConfigV3Screen(state, viewModel)
-                Section.Announce -> AnnounceV3Screen(state, viewModel)
-                Section.Devices -> DevicesV3Screen(state, viewModel)
-                Section.Operations -> OperationsV3Screen(state, viewModel)
+        // (adminScreenPadding даёт им вставки). Слой контента — источник
+        // для хрома; его консюмеры ниже — сиблинги, не вложены.
+        Box(Modifier.fillMaxSize().layerBackdrop(contentLayer)) {
+            if (state.backend == Backend.GlassFiles) {
+                GlassFilesPlaceholderV3()
+            } else {
+                when (state.section) {
+                    Section.Dashboard -> DashboardV3Screen(state, viewModel)
+                    Section.AppConfig -> AppConfigV3Screen(state, viewModel)
+                    Section.Announce -> AnnounceV3Screen(state, viewModel)
+                    Section.Devices -> DevicesV3Screen(state, viewModel)
+                    Section.Operations -> OperationsV3Screen(state, viewModel)
+                }
             }
         }
-        AdminEdgeBlur(topEdge = true, Modifier.align(Alignment.TopCenter))
-        if (state.backend == Backend.GsGit) {
-            AdminEdgeBlur(topEdge = false, Modifier.align(Alignment.BottomCenter))
-        }
-        AdminTopBar(
-            onRefresh = viewModel::refreshAll,
-            onLock = viewModel::lock,
-            onOperations = { viewModel.selectSection(Section.Operations) },
-            operationsActive = state.section == Section.Operations,
-            backend = state.backend,
-            onBackend = viewModel::selectBackend,
-        )
-        if (state.backend == Backend.GsGit) {
-            AdminBottomBar(adminNavigation, state.section, viewModel::selectSection, Modifier.align(Alignment.BottomCenter))
+        CompositionLocalProvider(LocalLiquidBackdrop provides chromeBackdrop) {
+            AdminEdgeBlur(topEdge = true, Modifier.align(Alignment.TopCenter))
+            if (state.backend == Backend.GsGit) {
+                AdminEdgeBlur(topEdge = false, Modifier.align(Alignment.BottomCenter))
+            }
+            AdminTopBar(
+                onRefresh = viewModel::refreshAll,
+                onLock = viewModel::lock,
+                onOperations = { viewModel.selectSection(Section.Operations) },
+                operationsActive = state.section == Section.Operations,
+                backend = state.backend,
+                onBackend = viewModel::selectBackend,
+            )
+            if (state.backend == Backend.GsGit) {
+                AdminBottomBar(adminNavigation, state.section, viewModel::selectSection, Modifier.align(Alignment.BottomCenter))
+            }
         }
     }
 }

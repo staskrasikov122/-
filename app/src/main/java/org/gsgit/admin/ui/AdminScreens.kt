@@ -475,30 +475,11 @@ private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 
 @Composable
 private fun GlassPanelV3() {
-    val glass = LocalGlassSettings.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AdminCard {
             AdminSectionLabel("обои")
             Spacer(Modifier.height(10.dp))
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                AdminWallpapers.items.forEachIndexed { index, res ->
-                    val selected = glass.wallpaper == index
-                    Image(
-                        painterResource(res),
-                        contentDescription = "обои ${index + 1}",
-                        modifier = Modifier
-                            .size(72.dp, 126.dp)
-                            .clip(RoundedRectangle(16.dp))
-                            .border(
-                                if (selected) 2.dp else 1.dp,
-                                if (selected) AdminTheme.colors.accent else Color.White.copy(alpha = 0.2f),
-                                RoundedRectangle(16.dp),
-                            )
-                            .liquidClickable(pressedScale = LiquidMotion.PressCard) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaper = index)) },
-                        contentScale = ContentScale.Crop,
-                    )
-                }
-            }
+            WallpaperPickerRow()
         }
         AdminCard {
             AdminSectionLabel("панели")
@@ -510,9 +491,9 @@ private fun GlassPanelV3() {
             GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.refractionAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionAmount = it)) }
             GlassSlider("яркость", "%.2f", -0.5f..0.5f, { GlassSettingsStore.state.value.brightness }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(brightness = it)) }
             GlassSlider("насыщенность", "%.2f", 0f..2f, { GlassSettingsStore.state.value.saturation }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(saturation = it)) }
-            AdminCheckRow("Глубина линзы", glass.depthEffect, { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(depthEffect = !glass.depthEffect)) })
-            AdminCheckRow("Хроматическая аберрация", glass.chromaticAberration, { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(chromaticAberration = !glass.chromaticAberration)) })
-            AdminCheckRow("Вибранс", glass.vibrancy, { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(vibrancy = !glass.vibrancy)) })
+            GlassToggleRow("Глубина линзы", { it.depthEffect }) { g, v -> g.copy(depthEffect = v) }
+            GlassToggleRow("Хроматическая аберрация", { it.chromaticAberration }) { g, v -> g.copy(chromaticAberration = v) }
+            GlassToggleRow("Вибранс", { it.vibrancy }) { g, v -> g.copy(vibrancy = v) }
         }
         AdminCard {
             AdminSectionLabel("кнопки и чипы")
@@ -536,6 +517,37 @@ private fun GlassPanelV3() {
         }
         AdminPillButton("сбросить настройки стекла", { GlassSettingsStore.reset() }, Modifier.fillMaxWidth(), accent = false)
     }
+}
+
+@Composable
+private fun WallpaperPickerRow() {
+    // Отдельный composable: подписка на настройки не рекомпозит всю панель.
+    val selectedIndex = GlassSettingsStore.state.value.wallpaper
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        AdminWallpapers.items.forEachIndexed { index, res ->
+            val selected = selectedIndex == index
+            Image(
+                painterResource(res),
+                contentDescription = "обои ${index + 1}",
+                modifier = Modifier
+                    .size(72.dp, 126.dp)
+                    .clip(RoundedRectangle(16.dp))
+                    .border(
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) AdminTheme.colors.accent else Color.White.copy(alpha = 0.2f),
+                        RoundedRectangle(16.dp),
+                    )
+                    .liquidClickable(pressedScale = LiquidMotion.PressCard) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaper = index)) },
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassToggleRow(label: String, get: (GlassSettings) -> Boolean, set: (GlassSettings, Boolean) -> GlassSettings) {
+    val checked = get(GlassSettingsStore.state.value)
+    AdminCheckRow(label, checked, { GlassSettingsStore.update(set(GlassSettingsStore.state.value, !checked)) })
 }
 
 @Composable

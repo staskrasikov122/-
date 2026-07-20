@@ -48,6 +48,7 @@ import com.kyant.backdrop.shadow.Shadow
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import kotlinx.coroutines.delay
+import org.gsgit.admin.data.GlassSettingsStore
 import org.gsgit.admin.ui.kyant.components.GlassBottomTabBar
 import org.gsgit.admin.ui.kyant.components.GlassTabItem
 import org.gsgit.admin.ui.kyant.components.LiquidToggle
@@ -127,8 +128,6 @@ half4 main(float2 coord) {
 
 @Composable
 fun AdminEdgeBlur(topEdge: Boolean, modifier: Modifier = Modifier) {
-    val glass = LocalGlassSettings.current
-    if (glass.edgeBlur <= 0f) return
     val backdrop = LocalLiquidBackdrop.current
     val system = WindowInsets.systemBars.asPaddingValues()
     val stripHeight =
@@ -142,7 +141,7 @@ fun AdminEdgeBlur(topEdge: Boolean, modifier: Modifier = Modifier) {
                 backdrop = backdrop,
                 shape = { RectangleShape },
                 effects = {
-                    blur(glass.edgeBlur.dp.toPx())
+                    blur(GlassSettingsStore.state.value.edgeBlur.dp.toPx())
                     runtimeShaderEffect("AlphaMask", EdgeBlurMaskShader, "content") {
                         setFloatUniform("size", size.width, size.height)
                         setFloatUniform("topEdge", if (topEdge) 1f else 0f)
@@ -192,37 +191,43 @@ fun AdminIcon(imageVector: ImageVector, description: String?, modifier: Modifier
 
 @Composable
 fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    val glass = LocalGlassSettings.current
-    val surfaceAlpha = (glass.cardSurfaceAlpha + if (elevated) 0.15f else 0f).coerceIn(0f, 1f)
-    val surface = Color(0xFF121212).copy(alpha = surfaceAlpha)
-    val cornerRadius = (if (elevated) glass.cardCornerRadius * 1.5f else glass.cardCornerRadius).dp
     val backdrop = LocalLiquidBackdrop.current
-    // Карточка НЕ экспортирует свой слой (правило кита: не плодить layerBackdrop
-    // по экрану — каждый экспорт это полный захват в текстуру на кадр).
-    // Вложенные стеклянные контролы преломляют те же обои сцены.
+    val contentBackdrop = rememberLayerBackdrop()
+    // Настройки стекла читаются ВНУТРИ draw-лямбд (как в плейграунде Kyant):
+    // изменение слайдера инвалидирует только отрисовку, без рекомпозиций.
     Column(
         modifier
             .fillMaxWidth()
             .drawBackdrop(
                 backdrop = backdrop,
-                shape = { RoundedRectangle(cornerRadius) },
+                shape = {
+                    val g = GlassSettingsStore.state.value
+                    RoundedRectangle((if (elevated) g.cardCornerRadius * 1.5f else g.cardCornerRadius).dp)
+                },
                 effects = {
-                    if (glass.vibrancy) vibrancy()
-                    colorControls(brightness = glass.brightness, saturation = glass.saturation)
-                    if (glass.cardBlur > 0f) blur(glass.cardBlur.dp.toPx())
+                    val g = GlassSettingsStore.state.value
+                    if (g.vibrancy) vibrancy()
+                    colorControls(brightness = g.brightness, saturation = g.saturation)
+                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
                     lens(
-                        glass.refractionHeight.dp.toPx(),
-                        glass.refractionAmount.dp.toPx(),
-                        depthEffect = glass.depthEffect,
-                        chromaticAberration = glass.chromaticAberration,
+                        g.refractionHeight.dp.toPx(),
+                        g.refractionAmount.dp.toPx(),
+                        depthEffect = g.depthEffect,
+                        chromaticAberration = g.chromaticAberration,
                     )
                 },
                 highlight = { Highlight.Plain },
-                onDrawSurface = { drawRect(surface) },
+                exportedBackdrop = contentBackdrop,
+                onDrawSurface = {
+                    val g = GlassSettingsStore.state.value
+                    val alpha = (g.cardSurfaceAlpha + if (elevated) 0.15f else 0f).coerceIn(0f, 1f)
+                    drawRect(Color(0xFF121212).copy(alpha = alpha))
+                },
             )
             .padding(horizontal = if (elevated) 24.dp else 18.dp, vertical = if (elevated) 22.dp else 16.dp),
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalLiquidBackdrop provides contentBackdrop) { content() }
+    }
 }
 
 /**
@@ -235,12 +240,11 @@ private fun AdminGlassCapsule(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    surfaceColor: Color = NeutralGlassSurface,
+    tint: Color = Color.Unspecified,
     height: Dp = 46.dp,
     horizontalPadding: Dp = 18.dp,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val glass = LocalGlassSettings.current
     val animationScope = rememberCoroutineScope()
     val interactiveHighlight = remember(animationScope) { InteractiveHighlight(animationScope = animationScope) }
     Row(
@@ -254,8 +258,8 @@ private fun AdminGlassCapsule(
                     lens(12.dp.toPx(), 24.dp.toPx(), chromaticAberration = true)
                 },
                 highlight = { Highlight.Ambient },
-                shadow = { Shadow(radius = 10.dp, color = Color.Black.copy(alpha = glass.controlShadow)) },
-                innerShadow = { InnerShadow(radius = 6.dp, alpha = glass.controlInnerShadow) },
+                shadow = { Shadow(radius = 10.dp, color = Color.Black.copy(alpha = GlassSettingsStore.state.value.controlShadow)) },
+                innerShadow = { InnerShadow(radius = 6.dp, alpha = GlassSettingsStore.state.value.controlInnerShadow) },
                 layerBlock = if (enabled) {
                     {
                         val width = size.width
@@ -280,8 +284,9 @@ private fun AdminGlassCapsule(
                     null
                 },
                 onDrawSurface = {
-                    drawRect(surfaceColor)
-                    drawRect(Color.White.copy(alpha = glass.controlStroke), style = Stroke(width = 0.8.dp.toPx()))
+                    val g = GlassSettingsStore.state.value
+                    drawRect(if (tint.isSpecified) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
+                    drawRect(Color.White.copy(alpha = g.controlStroke), style = Stroke(width = 0.8.dp.toPx()))
                 },
             )
             .clip(Capsule())
@@ -309,14 +314,13 @@ fun AdminPillButton(
     accent: Boolean = true,
 ) {
     val colors = AdminTheme.colors
-    val glass = LocalGlassSettings.current
     val filled = (accent || destructive) && enabled
     val tint = if (destructive) colors.error else colors.accent
     AdminGlassCapsule(
         onClick = { if (enabled) onClick() },
         modifier = modifier.alpha(if (enabled) 1f else 0.55f),
         enabled = enabled,
-        surfaceColor = if (filled) tint.copy(alpha = glass.tintAlpha) else NeutralGlassSurface,
+        tint = if (filled) tint else Color.Unspecified,
     ) {
         AdminText(
             label,
@@ -367,7 +371,6 @@ fun AdminIconAction(
     active: Boolean = false,
 ) {
     val colors = AdminTheme.colors
-    val glass = LocalGlassSettings.current
     val backdrop = LocalLiquidBackdrop.current
     val tint = colors.accent
     Box(
@@ -383,11 +386,12 @@ fun AdminIconAction(
                     lens(10.dp.toPx(), 20.dp.toPx(), chromaticAberration = true)
                 },
                 highlight = { Highlight.Ambient },
-                shadow = { Shadow(radius = 8.dp, color = Color.Black.copy(alpha = glass.controlShadow * 0.85f)) },
-                innerShadow = { InnerShadow(radius = 4.dp, alpha = glass.controlInnerShadow * 0.85f) },
+                shadow = { Shadow(radius = 8.dp, color = Color.Black.copy(alpha = GlassSettingsStore.state.value.controlShadow * 0.85f)) },
+                innerShadow = { InnerShadow(radius = 4.dp, alpha = GlassSettingsStore.state.value.controlInnerShadow * 0.85f) },
                 onDrawSurface = {
-                    drawRect(if (active) tint.copy(alpha = glass.tintAlpha) else NeutralGlassSurface)
-                    drawRect(Color.White.copy(alpha = glass.controlStroke * 0.9f), style = Stroke(width = 0.8.dp.toPx()))
+                    val g = GlassSettingsStore.state.value
+                    drawRect(if (active) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
+                    drawRect(Color.White.copy(alpha = g.controlStroke * 0.9f), style = Stroke(width = 0.8.dp.toPx()))
                 },
             )
             .clip(Capsule())
@@ -469,7 +473,6 @@ fun AdminCheckRow(label: String, checked: Boolean, onToggle: () -> Unit, descrip
 @Composable
 fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = false, onClick: (() -> Unit)? = null) {
     val colors = AdminTheme.colors
-    val glass = LocalGlassSettings.current
     val backdrop = LocalLiquidBackdrop.current
     val tint = when {
         destructive -> colors.error
@@ -488,11 +491,12 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                     lens(8.dp.toPx(), 16.dp.toPx())
                 },
                 highlight = { Highlight.Ambient },
-                shadow = { Shadow(radius = 6.dp, color = Color.Black.copy(alpha = glass.controlShadow * 0.75f)) },
-                innerShadow = { InnerShadow(radius = 3.dp, alpha = glass.controlInnerShadow * 0.75f) },
+                shadow = { Shadow(radius = 6.dp, color = Color.Black.copy(alpha = GlassSettingsStore.state.value.controlShadow * 0.75f)) },
+                innerShadow = { InnerShadow(radius = 3.dp, alpha = GlassSettingsStore.state.value.controlInnerShadow * 0.75f) },
                 onDrawSurface = {
-                    drawRect(if (tint.isSpecified) tint.copy(alpha = glass.tintAlpha) else NeutralGlassSurface)
-                    drawRect(Color.White.copy(alpha = glass.controlStroke * 0.8f), style = Stroke(width = 0.6.dp.toPx()))
+                    val g = GlassSettingsStore.state.value
+                    drawRect(if (tint.isSpecified) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
+                    drawRect(Color.White.copy(alpha = g.controlStroke * 0.8f), style = Stroke(width = 0.6.dp.toPx()))
                 },
             )
             .clip(Capsule())
@@ -616,7 +620,6 @@ fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Sect
     // Когда открыт раздел вне бара (операции), индикатор остаётся на последней вкладке.
     var lastIndex by rememberSaveable { mutableIntStateOf(0) }
     if (rawIndex >= 0 && rawIndex != lastIndex) lastIndex = rawIndex
-    val glass = LocalGlassSettings.current
     val tabs = remember(items) { items.map { GlassTabItem(it.icon, it.label) } }
     GlassBottomTabBar(
         backdrop = LocalLiquidBackdrop.current,
@@ -624,9 +627,6 @@ fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Sect
         onTabSelected = { index -> items.getOrNull(index)?.let { onSelect(it.section) } },
         tabs = tabs,
         modifier = modifier.navigationBarsPadding(),
-        lensHeight = glass.barLensHeight.dp,
-        lensAmount = glass.barLensAmount.dp,
-        surfaceAlpha = glass.barSurfaceAlpha,
     )
 }
 

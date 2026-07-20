@@ -1,8 +1,6 @@
 package org.gsgit.admin.ui
 
-import androidx.compose.runtime.compositionLocalOf
 import org.gsgit.admin.R
-import org.gsgit.admin.data.GlassSettings
 
 /** 11 обоев: роза по умолчанию + набор из архива пользователя. */
 object AdminWallpapers {
@@ -22,6 +20,3 @@ object AdminWallpapers {
 
     fun resFor(index: Int): Int = items.getOrElse(index) { items.first() }
 }
-
-/** Текущие настройки стекла; поставляются из GlassSettingsStore в AdminApp. */
-val LocalGlassSettings = compositionLocalOf { GlassSettings() }

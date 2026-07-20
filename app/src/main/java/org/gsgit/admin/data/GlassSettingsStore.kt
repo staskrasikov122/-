@@ -5,6 +5,12 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * Полный набор параметров жидкого стекла (по мотивам GlassPlaygroundContent
@@ -45,6 +51,8 @@ data class GlassSettings(
 object GlassSettingsStore {
     private const val PREFS = "glass_settings"
     private var prefs: SharedPreferences? = null
+    private val saveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var saveJob: Job? = null
 
     val state: MutableState<GlassSettings> = mutableStateOf(GlassSettings())
 
@@ -77,6 +85,16 @@ object GlassSettingsStore {
 
     fun update(settings: GlassSettings) {
         state.value = settings
+        // Дебаунс: во время драга слайдера тикают десятки обновлений в секунду,
+        // на диск пишем только когда значения устаканились.
+        saveJob?.cancel()
+        saveJob = saveScope.launch {
+            delay(400)
+            persist(settings)
+        }
+    }
+
+    private fun persist(settings: GlassSettings) {
         prefs?.edit()?.apply {
             putInt("wallpaper", settings.wallpaper)
             putFloat("cardCornerRadius", settings.cardCornerRadius)
