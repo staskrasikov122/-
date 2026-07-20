@@ -1,6 +1,5 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
@@ -9,12 +8,13 @@ def versionCodeValue = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
 
 android {
     namespace 'org.gsgit.admin'
-    compileSdk 36
+    compileSdk 37
+    buildToolsVersion '37.0.0'
 
     defaultConfig {
         applicationId 'org.gsgit.admin'
         minSdk 26
-        targetSdk 36
+        targetSdk 37
         versionCode versionCodeValue
         versionName versionNameValue
     }
@@ -45,10 +45,6 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = '17'
-    }
-
     buildFeatures {
         compose true
         buildConfig true
@@ -65,21 +61,23 @@ android {
 }
 
 dependencies {
-    implementation platform('androidx.compose:compose-bom:2024.12.01')
-    implementation 'androidx.core:core-ktx:1.15.0'
-    implementation 'androidx.activity:activity-compose:1.10.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
-    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.8.7'
-    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
-    implementation 'androidx.compose.ui:ui'
-    implementation 'androidx.compose.ui:ui-tooling-preview'
-    implementation 'androidx.compose.foundation:foundation'
-    implementation 'androidx.compose.material3:material3'
-    implementation 'androidx.compose.material:material-icons-extended'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
+    implementation 'androidx.core:core-ktx:1.19.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.10.0'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0'
+    implementation 'org.jetbrains.compose.runtime:runtime:1.11.1'
+    implementation 'org.jetbrains.compose.foundation:foundation:1.11.1'
+    implementation 'org.jetbrains.compose.ui:ui:1.11.1'
+    implementation 'org.jetbrains.compose.ui:ui-graphics:1.11.1'
+    implementation 'org.jetbrains.compose.ui:ui-tooling-preview:1.11.1'
+    implementation 'io.github.kyant0:backdrop:2.0.0'
+    implementation 'io.github.kyant0:shapes:1.2.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
     implementation 'androidx.security:security-crypto:1.1.0-alpha06'
+    implementation 'androidx.biometric:biometric:1.1.0'
+    implementation 'androidx.fragment:fragment-ktx:1.8.5'
 
     testImplementation 'junit:junit:4.13.2'
-    debugImplementation 'androidx.compose.ui:ui-tooling'
-    debugImplementation 'androidx.compose.ui:ui-test-manifest'
+    debugImplementation 'org.jetbrains.compose.ui:ui-tooling:1.11.1'
 }

@@ -1,0 +1,227 @@
+package org.gsgit.admin.ui.liquid
+
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastCoerceIn
+import androidx.compose.ui.util.fastRoundToInt
+import androidx.compose.ui.util.lerp
+import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.drawBackdrop
+import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
+import com.kyant.shapes.Capsule
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.sign
+
+/**
+ * Adapted from AndroidLiquidGlass kmp@b18eb0f LiquidBottomTabs.kt/LiquidBottomTab.kt.
+ * Copyright Kyant0, Apache-2.0.
+ */
+@Composable
+fun KyantLiquidBottomTabs(
+    selectedTabIndex: () -> Int,
+    onTabSelected: (Int) -> Unit,
+    backdrop: Backdrop,
+    tabsCount: Int,
+    modifier: Modifier = Modifier,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val accentColor = Color(0xFF30D8B0)
+    val containerColor = Color(0xFF121212).copy(alpha = 0.4f)
+    val tabsBackdrop = rememberLayerBackdrop()
+
+    BoxWithConstraints(modifier, contentAlignment = Alignment.CenterStart) {
+        val density = LocalDensity.current
+        val tabWidth = with(density) { (constraints.maxWidth.toFloat() - 8.dp.toPx()) / tabsCount }
+        val offsetAnimation = remember { Animatable(0f) }
+        val panelOffset by remember(density) {
+            derivedStateOf {
+                val fraction = (offsetAnimation.value / constraints.maxWidth).fastCoerceIn(-1f, 1f)
+                with(density) { 4.dp.toPx() * fraction.sign * EaseOut.transform(abs(fraction)) }
+            }
+        }
+        val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
+        val animationScope = rememberCoroutineScope()
+        var currentIndex by remember(selectedTabIndex) { mutableIntStateOf(selectedTabIndex()) }
+        val drag = remember(animationScope) {
+            KyantDampedDragAnimation(
+                animationScope = animationScope,
+                initialValue = selectedTabIndex().toFloat(),
+                valueRange = 0f..(tabsCount - 1).toFloat(),
+                visibilityThreshold = 0.001f,
+                initialScale = 1f,
+                pressedScale = 78f / 56f,
+                onDragStarted = {},
+                onDragStopped = {
+                    val target = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
+                    currentIndex = target
+                    animateToValue(target.toFloat())
+                    animationScope.launch { offsetAnimation.animateTo(0f, spring(1f, 300f, 0.5f)) }
+                },
+                onDrag = { _, amount ->
+                    updateValue((targetValue + amount.x / tabWidth * if (isLtr) 1f else -1f).fastCoerceIn(0f, (tabsCount - 1).toFloat()))
+                    animationScope.launch { offsetAnimation.snapTo(offsetAnimation.value + amount.x) }
+                },
+            )
+        }
+        LaunchedEffect(selectedTabIndex) { snapshotFlow { selectedTabIndex() }.collectLatest { currentIndex = it } }
+        LaunchedEffect(drag) {
+            snapshotFlow { currentIndex }.drop(1).collectLatest { index -> drag.animateToValue(index.toFloat()); onTabSelected(index) }
+        }
+        val interactiveHighlight = remember(animationScope) {
+            KyantInteractiveHighlight(animationScope) { size, _ ->
+                Offset(
+                    if (isLtr) (drag.value + 0.5f) * tabWidth + panelOffset else size.width - (drag.value + 0.5f) * tabWidth + panelOffset,
+                    size.height / 2f,
+                )
+            }
+        }
+
+        Row(
+            Modifier
+                .graphicsLayer { translationX = panelOffset }
+                .drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { Capsule() },
+                    effects = { vibrancy(); blur(8.dp.toPx()); lens(24.dp.toPx(), 24.dp.toPx()) },
+                    layerBlock = {
+                        val scale = lerp(1f, 1f + 16.dp.toPx() / size.width, drag.pressProgress)
+                        scaleX = scale; scaleY = scale
+                    },
+                    onDrawSurface = { drawRect(containerColor) },
+                )
+                .then(interactiveHighlight.modifier)
+                .height(64.dp)
+                .fillMaxWidth()
+                .padding(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+
+        CompositionLocalProvider(LocalKyantTabScale provides { lerp(1f, 1.2f, drag.pressProgress) }) {
+            Row(
+                Modifier
+                    .clearAndSetSemantics { }
+                    .alpha(0f)
+                    .layerBackdrop(tabsBackdrop)
+                    .graphicsLayer { translationX = panelOffset }
+                    .drawBackdrop(
+                        backdrop = backdrop,
+                        shape = { Capsule() },
+                        effects = {
+                            vibrancy(); blur(8.dp.toPx())
+                            lens(24.dp.toPx() * drag.pressProgress, 24.dp.toPx() * drag.pressProgress)
+                        },
+                        highlight = { Highlight.Default.copy(alpha = drag.pressProgress) },
+                        onDrawSurface = { drawRect(containerColor) },
+                    )
+                    .then(interactiveHighlight.modifier)
+                    .height(56.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp)
+                    .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
+                verticalAlignment = Alignment.CenterVertically,
+                content = content,
+            )
+        }
+
+        Box(
+            Modifier
+                .padding(horizontal = 4.dp)
+                .graphicsLayer {
+                    translationX = if (isLtr) drag.value * tabWidth + panelOffset else size.width - (drag.value + 1f) * tabWidth + panelOffset
+                }
+                .then(interactiveHighlight.gestureModifier)
+                .then(drag.modifier)
+                .drawBackdrop(
+                    backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
+                    shape = { Capsule() },
+                    effects = { lens(10.dp.toPx() * drag.pressProgress, 14.dp.toPx() * drag.pressProgress, chromaticAberration = true) },
+                    highlight = { Highlight.Default.copy(alpha = drag.pressProgress) },
+                    shadow = { Shadow(alpha = drag.pressProgress) },
+                    innerShadow = { InnerShadow(radius = 8.dp * drag.pressProgress, alpha = drag.pressProgress) },
+                    layerBlock = {
+                        scaleX = drag.scaleX; scaleY = drag.scaleY
+                        val velocity = drag.velocity / 10f
+                        scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
+                        scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                    },
+                    onDrawSurface = {
+                        drawRect(Color.White.copy(alpha = 0.1f), alpha = 1f - drag.pressProgress)
+                        drawRect(Color.Black.copy(alpha = 0.03f * drag.pressProgress))
+                    },
+                )
+                .height(56.dp)
+                .fillMaxWidth(1f / tabsCount),
+        )
+    }
+}
+
+private val LocalKyantTabScale = compositionLocalOf { { 1f } }
+
+@Composable
+fun RowScope.KyantLiquidBottomTab(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val scale = LocalKyantTabScale.current
+    Column(
+        modifier
+            .clip(Capsule())
+            .clickable(interactionSource = null, indication = null, role = Role.Tab, onClick = onClick)
+            .fillMaxHeight()
+            .weight(1f)
+            .graphicsLayer { val value = scale(); scaleX = value; scaleY = value },
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        content = content,
+    )
+}

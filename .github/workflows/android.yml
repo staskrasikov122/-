@@ -32,33 +32,10 @@ jobs:
       - uses: android-actions/setup-android@v4
 
       - name: Установка Android SDK
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: sdkmanager "platforms;android-37.0" "build-tools;37.0.0"
 
-      - name: Проверка кода, тесты и сборка APK
-        run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug --stacktrace
-
-      - name: Проверка подписи и подготовка артефакта
-        shell: bash
-        run: |
-          set -euo pipefail
-          version="$(sed -n 's/^ADMIN_VERSION_NAME=//p' gradle.properties | tail -n 1 | tr -d '\r')"
-          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf '::error::Некорректная ADMIN_VERSION_NAME: %s\n' "$version"
-            exit 1
-          fi
-          apk="app/build/outputs/apk/debug/app-debug.apk"
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk"
-          mkdir -p dist
-          cp "$apk" "dist/GsGit-Admin-${version}.apk"
-          cd dist
-          sha256sum "GsGit-Admin-${version}.apk" > SHA256SUMS.txt
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: gsgit-admin-${{ github.run_number }}
-          path: dist/
-          if-no-files-found: error
-          retention-days: 14
+      - name: Проверка кода и тесты
+        run: ./gradlew --no-daemon lintDebug testDebugUnitTest --stacktrace
 
       - name: Проверка наличия секретов release-подписи
         id: release_secrets
@@ -74,7 +51,8 @@ jobs:
             printf 'Release-подпись настроена. Собираю подписанный APK.\n'
           else
             printf 'enabled=false\n' >> "$GITHUB_OUTPUT"
-            printf 'Release-подпись пока не настроена. Debug APK уже собран.\n'
+            printf '::error::Не настроены все четыре секрета release-подписи.\n'
+            exit 1
           fi
 
       - name: Восстановление release-ключа
@@ -122,7 +100,7 @@ jobs:
           set -euo pipefail
           version="$(sed -n 's/^ADMIN_VERSION_NAME=//p' gradle.properties | tail -n 1 | tr -d '\r')"
           apk="app/build/outputs/apk/release/app-release.apk"
-          verify_output="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs "$apk")"
+          verify_output="$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --verbose --print-certs "$apk")"
           printf '%s\n' "$verify_output"
           expected='Signer #1 certificate SHA-256 digest: c6b600f8a6d6f32f325172407e7a76d7bf44f9962b357d2eb2ba99f78f002f5e'
           if ! grep -Fqi "$expected" <<< "$verify_output"; then

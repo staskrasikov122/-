@@ -1,301 +1,226 @@
 package org.gsgit.admin.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.statusBarsPadding
+import android.content.Context
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Campaign
-import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.Devices
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
-import org.gsgit.admin.ui.theme.TerminalBorder
-import org.gsgit.admin.ui.theme.TerminalGreen
-import org.gsgit.admin.ui.theme.TerminalMuted
-import org.gsgit.admin.ui.theme.TerminalSurface
+import org.gsgit.admin.ui.liquid.LiquidScene
+import org.gsgit.admin.ui.theme.AdminTheme
 
 @Composable
 fun AdminApp(viewModel: AdminViewModel) {
     val state by viewModel.state.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
+    var toast by remember { mutableStateOf<String?>(null) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> viewModel.onBackground()
+                Lifecycle.Event.ON_START -> viewModel.onForeground()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(viewModel) {
-        viewModel.messages.collectLatest { snackbarHostState.showSnackbar(it) }
+        viewModel.messages.collectLatest {
+            toast = it
+            delay(3_800)
+            toast = null
+        }
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+    LiquidScene {
         when (val auth = state.auth) {
-            AuthState.Restoring -> FullScreenLoader("восстановление защищённой сессии")
-            is AuthState.Locked -> LockScreen(
+            AuthState.Restoring -> CenterStatus("восстановление защищённой сессии")
+            is AuthState.Locked -> AdminKeyScreen(auth.error, false, viewModel::unlock)
+            AuthState.Checking -> AdminKeyScreen(null, true, viewModel::unlock)
+            is AuthState.BiometricRequired -> BiometricScreen(
                 error = auth.error,
-                checking = false,
-                onUnlock = viewModel::unlock,
+                onSuccess = viewModel::completeBiometricAuthentication,
+                onFailure = viewModel::biometricFailed,
+                onUseKey = viewModel::useAdminKeyInstead,
             )
-            AuthState.Checking -> LockScreen(
-                error = null,
-                checking = true,
-                onUnlock = viewModel::unlock,
-            )
-            AuthState.Unlocked -> AdminShell(
-                state = state,
-                snackbarHostState = snackbarHostState,
-                onBackend = viewModel::selectBackend,
-                onSection = viewModel::selectSection,
-                onRefresh = viewModel::refreshAll,
-                onLock = viewModel::lock,
-                viewModel = viewModel,
+            AuthState.Unlocked -> AdminShell(state, viewModel)
+        }
+        toast?.let { message ->
+            AdminToast(
+                message,
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 94.dp),
             )
         }
     }
 }
 
 @Composable
-private fun LockScreen(
-    error: String?,
-    checking: Boolean,
-    onUnlock: (String) -> Unit,
-) {
-    var key by remember { mutableStateOf("") }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier.widthIn(max = 460.dp).fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-        ) {
-            Text("[ Админ GsGit ]", style = MaterialTheme.typography.headlineMedium, color = TerminalGreen)
-            Text("панель управления заблокирована", style = MaterialTheme.typography.bodyMedium, color = TerminalMuted)
-            OutlinedTextField(
+private fun AdminKeyScreen(error: String?, checking: Boolean, onUnlock: (String) -> Unit) {
+    var key by rememberSaveable { mutableStateOf("") }
+    Box(Modifier.fillMaxSize().safeDrawingPadding().padding(22.dp), contentAlignment = Alignment.Center) {
+        AdminCard(Modifier.widthIn(max = 460.dp), elevated = true) {
+            AdminText("[ Админ GsGit ]", color = AdminTheme.colors.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(7.dp))
+            AdminText("панель управления заблокирована", color = AdminTheme.colors.textMuted, fontSize = 11.sp)
+            Spacer(Modifier.height(16.dp))
+            AdminTextField(
                 value = key,
                 onValueChange = { if (!checking) key = it },
-                modifier = Modifier.fillMaxWidth(),
+                label = "X-Admin-Key",
+                placeholder = "введите серверный ключ",
                 enabled = !checking,
-                singleLine = true,
-                label = { Text("X-Admin-Key") },
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { if (!checking) onUnlock(key) }),
-                isError = error != null,
-                supportingText = error?.let { { Text(it) } },
+                keyboardActions = KeyboardActions(onDone = { if (!checking && key.isNotBlank()) onUnlock(key) }),
             )
-            Button(
-                onClick = { onUnlock(key) },
-                enabled = !checking && key.isNotBlank(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (checking) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    Spacer(Modifier.width(10.dp))
-                    Text("ПРОВЕРКА")
-                } else {
-                    Text("РАЗБЛОКИРОВАТЬ")
-                }
+            if (!error.isNullOrBlank()) {
+                Spacer(Modifier.height(7.dp))
+                AdminText("! $error", color = AdminTheme.colors.error, fontSize = 11.sp)
             }
+            Spacer(Modifier.height(13.dp))
+            if (checking) AdminSpinner("проверка ключа на сервере")
+            else AdminPillButton("разблокировать", { onUnlock(key) }, Modifier.fillMaxWidth(), enabled = key.isNotBlank())
         }
     }
 }
 
 @Composable
-private fun AdminShell(
-    state: AdminUiState,
-    snackbarHostState: SnackbarHostState,
-    onBackend: (Backend) -> Unit,
-    onSection: (Section) -> Unit,
-    onRefresh: () -> Unit,
-    onLock: () -> Unit,
-    viewModel: AdminViewModel,
+private fun BiometricScreen(
+    error: String?,
+    onSuccess: () -> Unit,
+    onFailure: (String) -> Unit,
+    onUseKey: () -> Unit,
 ) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 840.dp
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-            topBar = {
-                AdminTopBar(
-                    backend = state.backend,
-                    onBackend = onBackend,
-                    onRefresh = onRefresh,
-                    onLock = onLock,
-                )
-            },
-            bottomBar = {
-                if (!wide && state.backend == Backend.GsGit) {
-                    AdminBottomNavigation(state.section, onSection)
-                }
-            },
-        ) { padding ->
-            Row(modifier = Modifier.fillMaxSize().padding(padding)) {
-                if (wide && state.backend == Backend.GsGit) {
-                    AdminSideNavigation(state.section, onSection)
-                }
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    if (state.backend == Backend.GlassFiles) {
-                        GlassFilesPlaceholder()
-                    } else {
-                        when (state.section) {
-                            Section.Dashboard -> DashboardV2Screen(state, viewModel)
-                            Section.AppConfig -> AppConfigV2Screen(state, viewModel)
-                            Section.Announce -> AnnounceV2Screen(state, viewModel)
-                            Section.Devices -> DevicesV2Screen(state, viewModel)
-                            Section.Operations -> OperationsScreen(state, viewModel)
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    var promptStarted by remember { mutableStateOf(false) }
+    val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+    val prompt = remember(activity) {
+        activity?.let {
+            BiometricPrompt(
+                it,
+                ContextCompat.getMainExecutor(it),
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onSuccess()
+                    override fun onAuthenticationFailed() = onFailure("Отпечаток или лицо не распознаны")
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        if (errorCode != BiometricPrompt.ERROR_CANCELED && errorCode != BiometricPrompt.ERROR_USER_CANCELED) {
+                            onFailure(errString.toString())
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AdminTopBar(
-    backend: Backend,
-    onBackend: (Backend) -> Unit,
-    onRefresh: () -> Unit,
-    onLock: () -> Unit,
-) {
-    Surface(color = TerminalSurface) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("> админ сервера", style = MaterialTheme.typography.titleLarge)
-                    Text("api.gsgit.org", style = MaterialTheme.typography.labelMedium, color = TerminalMuted)
-                }
-                IconButton(onClick = onRefresh, enabled = backend == Backend.GsGit) {
-                    Icon(Icons.Outlined.Refresh, contentDescription = "Обновить")
-                }
-                TextButton(onClick = onLock) {
-                    Icon(Icons.Outlined.Lock, contentDescription = null, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(7.dp))
-                    Text("ЗАБЛОКИРОВАТЬ")
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Backend.entries.forEach { item ->
-                    FilterChip(
-                        selected = backend == item,
-                        onClick = { onBackend(item) },
-                        label = { Text(item.name) },
-                    )
-                }
-            }
-        }
-    }
-}
-
-private data class NavigationItem(
-    val section: Section,
-    val label: String,
-    val icon: ImageVector,
-)
-
-private val navigationItems = listOf(
-    NavigationItem(Section.Dashboard, "Обзор", Icons.Outlined.Dashboard),
-    NavigationItem(Section.AppConfig, "Настройки", Icons.Outlined.Settings),
-    NavigationItem(Section.Announce, "Рассылка", Icons.Outlined.Campaign),
-    NavigationItem(Section.Devices, "Устройства", Icons.Outlined.Devices),
-    NavigationItem(Section.Operations, "Операции", Icons.Outlined.Build),
-)
-
-@Composable
-private fun AdminBottomNavigation(selected: Section, onSection: (Section) -> Unit) {
-    NavigationBar(containerColor = TerminalSurface) {
-        navigationItems.forEach { item ->
-            NavigationBarItem(
-                selected = selected == item.section,
-                onClick = { onSection(item.section) },
-                icon = { Icon(item.icon, contentDescription = item.label) },
-                label = { Text(item.label) },
+                },
             )
         }
     }
+
+    fun requestAuthentication() {
+        val available = BiometricManager.from(context).canAuthenticate(authenticators)
+        if (activity == null || prompt == null || available != BiometricManager.BIOMETRIC_SUCCESS) {
+            onFailure(biometricError(context, available))
+            return
+        }
+        prompt.authenticate(
+            BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Админ GsGit")
+                .setSubtitle("Подтвердите доступ к серверной панели")
+                .setAllowedAuthenticators(authenticators)
+                .build(),
+        )
+    }
+
+    LaunchedEffect(prompt) {
+        if (!promptStarted) {
+            promptStarted = true
+            requestAuthentication()
+        }
+    }
+
+    Box(Modifier.fillMaxSize().safeDrawingPadding().padding(22.dp), contentAlignment = Alignment.Center) {
+        AdminCard(Modifier.widthIn(max = 460.dp), elevated = true) {
+            AdminText("> защищённый вход", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            AdminText("Сохранённый ключ остаётся зашифрованным. Подтвердите личность системным способом.", color = AdminTheme.colors.textSecondary, fontSize = 11.sp)
+            if (!error.isNullOrBlank()) {
+                Spacer(Modifier.height(9.dp))
+                AdminText("! $error", color = AdminTheme.colors.error, fontSize = 11.sp)
+            }
+            Spacer(Modifier.height(14.dp))
+            AdminPillButton("отпечаток / лицо", ::requestAuthentication, Modifier.fillMaxWidth())
+            Spacer(Modifier.height(7.dp))
+            AdminTextAction("ввести X-Admin-Key", onUseKey, Modifier.fillMaxWidth())
+        }
+    }
 }
 
+private fun biometricError(context: Context, code: Int): String = when (code) {
+    BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "На устройстве не настроен отпечаток, лицо или PIN"
+    BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "Биометрия на устройстве недоступна"
+    BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "Модуль биометрии временно недоступен"
+    else -> "Системная аутентификация недоступна ($code)"
+}
+
+private val adminNavigation = listOf(
+    AdminNavItem(Section.Dashboard, "обзор", "◉"),
+    AdminNavItem(Section.AppConfig, "конфиг", "⌁"),
+    AdminNavItem(Section.Announce, "пуши", "⌁"),
+    AdminNavItem(Section.Devices, "устройства", "◇"),
+    AdminNavItem(Section.Operations, "операции", "⚙"),
+)
+
 @Composable
-private fun AdminSideNavigation(selected: Section, onSection: (Section) -> Unit) {
-    Surface(
-        modifier = Modifier.width(220.dp).fillMaxHeight(),
-        color = TerminalSurface,
-        border = BorderStroke(1.dp, TerminalBorder),
-    ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            navigationItems.forEach { item ->
-                FilterChip(
-                    selected = selected == item.section,
-                    onClick = { onSection(item.section) },
-                    label = { Text(item.label) },
-                    leadingIcon = { Icon(item.icon, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
+    Column(Modifier.fillMaxSize()) {
+        AdminTopBar(viewModel::refreshAll, viewModel::lock, state.backend, viewModel::selectBackend)
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            if (state.backend == Backend.GlassFiles) {
+                GlassFilesPlaceholderV3()
+            } else {
+                when (state.section) {
+                    Section.Dashboard -> DashboardV3Screen(state, viewModel)
+                    Section.AppConfig -> AppConfigV3Screen(state, viewModel)
+                    Section.Announce -> AnnounceV3Screen(state, viewModel)
+                    Section.Devices -> DevicesV3Screen(state, viewModel)
+                    Section.Operations -> OperationsV3Screen(state, viewModel)
+                }
             }
         }
+        if (state.backend == Backend.GsGit) AdminBottomBar(adminNavigation, state.section, viewModel::selectSection)
     }
 }
 
 @Composable
-private fun FullScreenLoader(label: String) {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 2.dp)
-            Text(label, color = TerminalMuted, style = MaterialTheme.typography.bodyMedium)
+private fun GlassFilesPlaceholderV3() {
+    Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
+        AdminCard(Modifier.widthIn(max = 520.dp)) {
+            AdminText("[ GlassFiles ]", color = AdminTheme.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            AdminText("Контракт API пока не подключён. Вымышленные запросы не выполняются.", color = AdminTheme.colors.textMuted)
         }
     }
+}
+
+@Composable
+private fun CenterStatus(message: String) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { AdminSpinner(message) }
 }

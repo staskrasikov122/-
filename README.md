@@ -16,20 +16,31 @@
 - журнал действий администратора и агрегированные ошибки сервера;
 - явная заглушка GlassFiles до получения настоящего контракта API;
 - состояния загрузки, пустых данных и ошибок с возможностью повтора.
+- полностью стеклянный Compose-интерфейс на Backdrop от Kyant0;
+- системная биометрия, запрет скриншотов и настраиваемая автоблокировка.
+
+## Liquid Glass
+
+Интерфейс использует `io.github.kyant0:backdrop:2.0.0` и актуальные компоненты,
+адаптированные из AndroidLiquidGlass `kmp@b18eb0f`. Фон приложения — единственный
+корневой `layerBackdrop`, а все `drawBackdrop` находятся в соседнем дереве. Нельзя
+перемещать стеклянный UI внутрь захватываемого фона: циклический backdrop приводит к
+native-crash RenderThread. Подробная атрибуция находится в `THIRD_PARTY_NOTICES.md`.
 
 ## Сборка
 
 ```bash
-./gradlew :app:assembleDebug
+./gradlew :app:assembleRelease
 ```
 
 Устанавливаемый APK появится здесь:
 
 ```text
-app/build/outputs/apk/debug/app-debug.apk
+app/build/outputs/apk/release/app-release.apk
 ```
 
-GitHub Actions также собирает APK и сохраняет его в приватном артефакте сборки.
+GitHub Actions собирает только подписанный release APK и сохраняет его в приватном
+артефакте сборки. Debug APK не публикуется.
 
 ## Безопасность
 
@@ -51,8 +62,8 @@ Release-подпись намеренно не хранится в репози�
 - `ADMIN_RELEASE_KEY_ALIAS`;
 - `ADMIN_RELEASE_KEY_PASSWORD`.
 
-Если все четыре секрета заданы, workflow дополнительно собирает release APK, проверяет
-его сертификат и публикует отдельный приватный артефакт `gsgit-admin-release-*`.
+Workflow требует все четыре секрета, собирает release APK, проверяет его сертификат и
+публикует приватный артефакт `gsgit-admin-release-*`.
 
 ## Графика
 

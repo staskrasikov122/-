@@ -1,64 +1,76 @@
 package org.gsgit.admin.ui.theme
 
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.Typography
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
 import org.gsgit.admin.R
 
-val TerminalGreen = Color(0xFF2EE66B)
-val TerminalBackground = Color(0xFF050605)
-val TerminalSurface = Color(0xFF0B0E0C)
-val TerminalSurfaceHigh = Color(0xFF121713)
-val TerminalBorder = Color(0xFF263029)
-val TerminalText = Color(0xFFE5ECE6)
-val TerminalMuted = Color(0xFF8E9A91)
-val TerminalRed = Color(0xFFFF5D73)
-val TerminalAmber = Color(0xFFFFC857)
+@Immutable
+data class AdminColors(
+    val background: Color,
+    val surface: Color,
+    val surfaceElevated: Color,
+    val border: Color,
+    val accent: Color,
+    val accentDim: Color,
+    val textPrimary: Color,
+    val textSecondary: Color,
+    val textMuted: Color,
+    val warning: Color,
+    val error: Color,
+)
 
-private val JetBrainsMono = FontFamily(
+val AdminDarkColors = AdminColors(
+    background = Color(0xFF000000),
+    surface = Color(0xFF0A0A0A),
+    surfaceElevated = Color(0xFF141414),
+    border = Color(0xFF1F1F1F),
+    accent = Color(0xFFA8D982),
+    accentDim = Color(0xFF6B8C54),
+    textPrimary = Color(0xFFE0E0E0),
+    textSecondary = Color(0xFF999999),
+    textMuted = Color(0xFF5C5C5C),
+    warning = Color(0xFFE5C07B),
+    error = Color(0xFFE06C75),
+)
+
+val LocalAdminColors = compositionLocalOf { AdminDarkColors }
+
+object AdminTheme {
+    val colors: AdminColors
+        @Composable @ReadOnlyComposable get() = LocalAdminColors.current
+}
+
+val JetBrainsMono = FontFamily(
     Font(R.font.jetbrains_mono_regular, FontWeight.Normal),
     Font(R.font.jetbrains_mono_medium, FontWeight.Medium),
     Font(R.font.jetbrains_mono_bold, FontWeight.Bold),
 )
 
-private val AdminColors = darkColorScheme(
-    primary = TerminalGreen,
-    onPrimary = TerminalBackground,
-    secondary = TerminalGreen,
-    background = TerminalBackground,
-    onBackground = TerminalText,
-    surface = TerminalSurface,
-    onSurface = TerminalText,
-    surfaceVariant = TerminalSurfaceHigh,
-    onSurfaceVariant = TerminalMuted,
-    outline = TerminalBorder,
-    error = TerminalRed,
-    onError = TerminalBackground,
-)
-
-private val AdminTypography = Typography(
-    displaySmall = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 32.sp, lineHeight = 38.sp),
-    headlineMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 23.sp, lineHeight = 30.sp),
-    titleLarge = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 18.sp, lineHeight = 24.sp),
-    titleMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, fontSize = 15.sp, lineHeight = 21.sp),
-    bodyLarge = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Normal, fontSize = 15.sp, lineHeight = 22.sp),
-    bodyMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Normal, fontSize = 13.sp, lineHeight = 19.sp),
-    labelLarge = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Bold, fontSize = 13.sp, lineHeight = 18.sp),
-    labelMedium = TextStyle(fontFamily = JetBrainsMono, fontWeight = FontWeight.Medium, fontSize = 11.sp, lineHeight = 16.sp),
-)
+// Совместимые имена цветов для data/UI кода. Источник значений совпадает с GsGit AI/GitHub UI.
+val TerminalGreen = AdminDarkColors.accent
+val TerminalBackground = AdminDarkColors.background
+val TerminalSurface = AdminDarkColors.surface
+val TerminalSurfaceHigh = AdminDarkColors.surfaceElevated
+val TerminalBorder = AdminDarkColors.border
+val TerminalText = AdminDarkColors.textPrimary
+val TerminalMuted = AdminDarkColors.textSecondary
+val TerminalRed = AdminDarkColors.error
+val TerminalAmber = AdminDarkColors.warning
 
 @Composable
 fun GsGitAdminTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = AdminColors,
-        typography = AdminTypography,
-        content = content,
-    )
+    CompositionLocalProvider(LocalAdminColors provides AdminDarkColors) {
+        Box(Modifier.fillMaxSize().background(AdminDarkColors.background)) { content() }
+    }
 }

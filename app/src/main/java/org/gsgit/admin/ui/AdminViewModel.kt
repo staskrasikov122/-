@@ -1,6 +1,7 @@
 package org.gsgit.admin.ui
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.channels.BufferOverflow
@@ -18,6 +19,7 @@ enum class Section { Dashboard, AppConfig, Announce, Devices, Operations }
 sealed interface AuthState {
     data object Restoring : AuthState
     data class Locked(val error: String? = null) : AuthState
+    data class BiometricRequired(val error: String? = null) : AuthState
     data object Checking : AuthState
     data object Unlocked : AuthState
 }
@@ -50,12 +52,17 @@ data class AdminUiState(
     val sendingAnnouncement: Boolean = false,
     val togglingKillSwitch: Boolean = false,
     val busyAction: String? = null,
+    val biometricEnabled: Boolean = true,
+    val lockTimeoutMinutes: Int = 5,
 )
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val api = AdminApi()
     private val keyStore = AdminKeyStore(application)
+    private val securityStore = AdminSecurityStore(application)
     private var sessionKey: String? = null
+    private var pendingSavedKey: String? = null
+    private var backgroundAtMs: Long? = null
 
     private val _state = MutableStateFlow(AdminUiState())
     val state = _state.asStateFlow()
@@ -67,8 +74,20 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     val messages = _messages.asSharedFlow()
 
     init {
-        keyStore.read()?.let { validateKey(it, persisted = true) }
-            ?: _state.update { it.copy(auth = AuthState.Locked()) }
+        _state.update {
+            it.copy(
+                biometricEnabled = securityStore.biometricEnabled,
+                lockTimeoutMinutes = securityStore.lockTimeoutMinutes,
+            )
+        }
+        keyStore.read()?.let { savedKey ->
+            pendingSavedKey = savedKey
+            if (securityStore.biometricEnabled) {
+                _state.update { it.copy(auth = AuthState.BiometricRequired()) }
+            } else {
+                validateKey(savedKey, persisted = true)
+            }
+        } ?: _state.update { it.copy(auth = AuthState.Locked()) }
     }
 
     fun unlock(key: String) {
@@ -81,9 +100,69 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun lock() {
+        val saved = sessionKey ?: keyStore.read()
+        pendingSavedKey = saved
         sessionKey = null
+        _state.update {
+            it.copy(
+                auth = if (securityStore.biometricEnabled && saved != null) {
+                    AuthState.BiometricRequired()
+                } else {
+                    AuthState.Locked("Сессия заблокирована")
+                },
+            )
+        }
+    }
+
+    fun logout() {
+        sessionKey = null
+        pendingSavedKey = null
         keyStore.clear()
-        _state.value = AdminUiState(auth = AuthState.Locked())
+        _state.value = AdminUiState(
+            auth = AuthState.Locked(),
+            biometricEnabled = securityStore.biometricEnabled,
+            lockTimeoutMinutes = securityStore.lockTimeoutMinutes,
+        )
+    }
+
+    fun completeBiometricAuthentication() {
+        val saved = pendingSavedKey ?: keyStore.read()
+        if (saved == null) {
+            _state.update { it.copy(auth = AuthState.Locked("Сохранённый ключ не найден")) }
+            return
+        }
+        validateKey(saved, persisted = true)
+    }
+
+    fun biometricFailed(message: String) {
+        _state.update { it.copy(auth = AuthState.BiometricRequired(message)) }
+    }
+
+    fun useAdminKeyInstead() {
+        sessionKey = null
+        _state.update { it.copy(auth = AuthState.Locked()) }
+    }
+
+    fun onBackground() {
+        if (_state.value.auth == AuthState.Unlocked) backgroundAtMs = SystemClock.elapsedRealtime()
+    }
+
+    fun onForeground() {
+        val backgroundAt = backgroundAtMs ?: return
+        backgroundAtMs = null
+        val elapsed = SystemClock.elapsedRealtime() - backgroundAt
+        if (elapsed >= securityStore.lockTimeoutMinutes * 60_000L) lock()
+    }
+
+    fun setBiometricEnabled(enabled: Boolean) {
+        securityStore.biometricEnabled = enabled
+        _state.update { it.copy(biometricEnabled = enabled) }
+    }
+
+    fun setLockTimeout(minutes: Int) {
+        if (minutes !in AdminSecurityStore.ALLOWED_TIMEOUTS) return
+        securityStore.lockTimeoutMinutes = minutes
+        _state.update { it.copy(lockTimeoutMinutes = minutes) }
     }
 
     fun selectBackend(backend: Backend) = _state.update { it.copy(backend = backend) }
@@ -300,6 +379,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val stats = api.getStats(key)
                 sessionKey = key
+                pendingSavedKey = key
                 if (!persisted) keyStore.save(key)
                 _state.update { it.copy(auth = AuthState.Unlocked, stats = LoadState.Ready(stats)) }
                 loadHealth()
