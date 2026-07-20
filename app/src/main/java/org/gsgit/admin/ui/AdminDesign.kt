@@ -32,7 +32,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.util.fastCoerceAtMost
+import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -41,22 +44,29 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.runtimeShaderEffect
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import kotlinx.coroutines.delay
 import org.gsgit.admin.ui.kyant.components.GlassBottomTabBar
 import org.gsgit.admin.ui.kyant.components.GlassTabItem
-import org.gsgit.admin.ui.kyant.components.LiquidButton
 import org.gsgit.admin.ui.kyant.components.LiquidToggle
+import org.gsgit.admin.ui.kyant.utils.InteractiveHighlight
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.liquid.RegisterLiquidOverlay
 import org.gsgit.admin.ui.theme.AdminFont
 import org.gsgit.admin.ui.theme.AdminTheme
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.tanh
 
 // Тёмная сцена по исходникам Kyant0/AndroidLiquidGlass:
 //  * панель с текстом = тёмный вариант его DialogContent:
 //    colorControls(0, 1.5) + blur(8dp) + lens(24dp, 48dp, depthEffect) + поверхность 121212;
-//  * все кнопки — стеклянные LiquidButton (tinted / surface из ButtonsContent);
+//  * все кнопки — объёмные стеклянные капсулы (линза + блик + тени + окантовка);
 //  * нижний бар — GlassBottomTabBar, портирован из GlassFiles: парящая
 //    капсула с усиленной линзой, индикатор резкий.
 
@@ -205,6 +215,79 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
     }
 }
 
+/**
+ * Стеклянная капсула с объёмом: линза + Ambient-блик + внешняя и внутренняя
+ * тени + тонкая белая окантовка (рецепт GlassFab из GlassFiles). Физика
+ * нажатия — как у LiquidButton Kyant.
+ */
+@Composable
+private fun AdminGlassCapsule(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    surfaceColor: Color = NeutralGlassSurface,
+    height: Dp = 46.dp,
+    horizontalPadding: Dp = 18.dp,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val animationScope = rememberCoroutineScope()
+    val interactiveHighlight = remember(animationScope) { InteractiveHighlight(animationScope = animationScope) }
+    Row(
+        modifier
+            .drawBackdrop(
+                backdrop = LocalLiquidBackdrop.current,
+                shape = { Capsule() },
+                effects = {
+                    vibrancy()
+                    blur(2.dp.toPx())
+                    lens(12.dp.toPx(), 24.dp.toPx(), chromaticAberration = true)
+                },
+                highlight = { Highlight.Ambient },
+                shadow = { Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.3f)) },
+                innerShadow = { InnerShadow(radius = 6.dp, alpha = 0.3f) },
+                layerBlock = if (enabled) {
+                    {
+                        val width = size.width
+                        val heightPx = size.height
+                        val progress = interactiveHighlight.pressProgress
+                        val scale = lerp(1f, 1f + 4.dp.toPx() / size.height, progress)
+                        val maxOffset = size.minDimension
+                        val initialDerivative = 0.05f
+                        val offset = interactiveHighlight.offset
+                        translationX = maxOffset * tanh(initialDerivative * offset.x / maxOffset)
+                        translationY = maxOffset * tanh(initialDerivative * offset.y / maxOffset)
+                        val maxDragScale = 4.dp.toPx() / size.height
+                        val offsetAngle = atan2(offset.y, offset.x)
+                        scaleX = scale +
+                            maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) *
+                            (width / heightPx).fastCoerceAtMost(1f)
+                        scaleY = scale +
+                            maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) *
+                            (heightPx / width).fastCoerceAtMost(1f)
+                    }
+                } else {
+                    null
+                },
+                onDrawSurface = {
+                    drawRect(surfaceColor)
+                    drawRect(Color.White.copy(alpha = 0.18f), style = Stroke(width = 0.8.dp.toPx()))
+                },
+            )
+            .clip(Capsule())
+            // Обратную связь даёт физика сжатия капсулы, стандартная индикация не нужна.
+            .clickable(interactionSource = null, indication = null, enabled = enabled, onClick = onClick)
+            .then(
+                if (enabled) Modifier.then(interactiveHighlight.modifier).then(interactiveHighlight.gestureModifier)
+                else Modifier
+            )
+            .height(height)
+            .padding(horizontal = horizontalPadding),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
 @Composable
 fun AdminPillButton(
     label: String,
@@ -217,11 +300,10 @@ fun AdminPillButton(
     val colors = AdminTheme.colors
     val filled = (accent || destructive) && enabled
     val tint = if (destructive) colors.error else colors.accent
-    LiquidButton(
+    AdminGlassCapsule(
         onClick = { if (enabled) onClick() },
-        backdrop = LocalLiquidBackdrop.current,
         modifier = modifier.alpha(if (enabled) 1f else 0.55f),
-        isInteractive = enabled,
+        enabled = enabled,
         surfaceColor = if (filled) tint.copy(alpha = TintedGlassAlpha) else NeutralGlassSurface,
     ) {
         AdminText(
@@ -284,11 +366,14 @@ fun AdminIconAction(
                 effects = {
                     vibrancy()
                     blur(2.dp.toPx())
-                    lens(10.dp.toPx(), 20.dp.toPx())
+                    lens(10.dp.toPx(), 20.dp.toPx(), chromaticAberration = true)
                 },
-                highlight = { Highlight.Plain },
+                highlight = { Highlight.Ambient },
+                shadow = { Shadow(radius = 8.dp, color = Color.Black.copy(alpha = 0.25f)) },
+                innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.25f) },
                 onDrawSurface = {
                     drawRect(if (active) tint.copy(alpha = TintedGlassAlpha) else NeutralGlassSurface)
+                    drawRect(Color.White.copy(alpha = 0.16f), style = Stroke(width = 0.8.dp.toPx()))
                 },
             )
             .clip(Capsule())
@@ -387,9 +472,12 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                     blur(2.dp.toPx())
                     lens(8.dp.toPx(), 16.dp.toPx())
                 },
-                highlight = { Highlight.Plain },
+                highlight = { Highlight.Ambient },
+                shadow = { Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.22f)) },
+                innerShadow = { InnerShadow(radius = 3.dp, alpha = 0.22f) },
                 onDrawSurface = {
                     drawRect(if (tint.isSpecified) tint.copy(alpha = TintedGlassAlpha) else NeutralGlassSurface)
+                    drawRect(Color.White.copy(alpha = 0.14f), style = Stroke(width = 0.6.dp.toPx()))
                 },
             )
             .clip(Capsule())
