@@ -17,7 +17,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.paint
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
@@ -59,7 +58,10 @@ import org.gsgit.admin.ui.theme.AdminTheme
 //  * нижний бар без подложки: вкладки на обоях, выбранную показывает
 //    стеклянная капсула-индикатор (LiquidBottomTabsBare).
 
-private val NeutralGlassSurface = Color(0xFF121212).copy(alpha = 0.4f)
+// Полупрозрачные поверхности стеклянных контролов: на тёмных обоях цвет
+// должен пропускать фон, иначе стекло читается как сплошной пластик.
+private val NeutralGlassSurface = Color.White.copy(alpha = 0.12f)
+private const val TintedGlassAlpha = 0.6f
 
 @Composable
 fun AdminText(
@@ -140,8 +142,7 @@ fun AdminPillButton(
         backdrop = LocalLiquidBackdrop.current,
         modifier = modifier.alpha(if (enabled) 1f else 0.55f),
         isInteractive = enabled,
-        tint = if (filled) tint else Color.Unspecified,
-        surfaceColor = if (filled) Color.Unspecified else NeutralGlassSurface,
+        surfaceColor = if (filled) tint.copy(alpha = TintedGlassAlpha) else NeutralGlassSurface,
     ) {
         AdminText(
             label,
@@ -207,12 +208,7 @@ fun AdminIconAction(
                 },
                 highlight = { Highlight.Plain },
                 onDrawSurface = {
-                    if (active) {
-                        drawRect(tint, blendMode = BlendMode.Hue)
-                        drawRect(tint.copy(alpha = 0.75f))
-                    } else {
-                        drawRect(NeutralGlassSurface)
-                    }
+                    drawRect(if (active) tint.copy(alpha = TintedGlassAlpha) else NeutralGlassSurface)
                 },
             )
             .clip(Capsule())
@@ -313,12 +309,7 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                 },
                 highlight = { Highlight.Plain },
                 onDrawSurface = {
-                    if (tint.isSpecified) {
-                        drawRect(tint, blendMode = BlendMode.Hue)
-                        drawRect(tint.copy(alpha = 0.75f))
-                    } else {
-                        drawRect(NeutralGlassSurface)
-                    }
+                    drawRect(if (tint.isSpecified) tint.copy(alpha = TintedGlassAlpha) else NeutralGlassSurface)
                 },
             )
             .clip(Capsule())
@@ -412,41 +403,25 @@ fun AdminTopBar(
     onBackend: (Backend) -> Unit,
 ) {
     val colors = AdminTheme.colors
-    val sceneBackdrop = LocalLiquidBackdrop.current
-    val barBackdrop = rememberLayerBackdrop()
+    // Без подложки: заголовок и стеклянные кнопки лежат прямо на обоях.
     Column(
         Modifier
             .fillMaxWidth()
             .statusBarsPadding()
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .drawBackdrop(
-                backdrop = sceneBackdrop,
-                shape = { RoundedRectangle(32.dp) },
-                effects = {
-                    colorControls(brightness = 0f, saturation = 1.5f)
-                    blur(8.dp.toPx())
-                    lens(24.dp.toPx(), 48.dp.toPx(), depthEffect = true)
-                },
-                highlight = { Highlight.Plain },
-                exportedBackdrop = barBackdrop,
-                onDrawSurface = { drawRect(colors.surface) },
-            )
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 10.dp),
     ) {
-        CompositionLocalProvider(LocalLiquidBackdrop provides barBackdrop) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                    AdminText("Админ сервера", fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    AdminText("api.gsgit.org", color = colors.textMuted, fontSize = 11.sp, maxLines = 1)
-                }
-                AdminIconAction(AdminIcons.Refresh, "обновить", onRefresh, enabled = backend == Backend.GsGit)
-                AdminIconAction(AdminIcons.Settings, "операции", onOperations, active = operationsActive)
-                AdminIconAction(AdminIcons.Lock, "заблокировать", onLock)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                AdminText("Админ сервера", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                AdminText("api.gsgit.org", color = colors.textMuted, fontSize = 11.sp, maxLines = 1)
             }
-            Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Backend.entries.forEach { item -> AdminChip(item.name, backend == item) { onBackend(item) } }
-            }
+            AdminIconAction(AdminIcons.Refresh, "обновить", onRefresh, enabled = backend == Backend.GsGit)
+            AdminIconAction(AdminIcons.Settings, "операции", onOperations, active = operationsActive)
+            AdminIconAction(AdminIcons.Lock, "заблокировать", onLock)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Backend.entries.forEach { item -> AdminChip(item.name, backend == item) { onBackend(item) } }
         }
     }
 }

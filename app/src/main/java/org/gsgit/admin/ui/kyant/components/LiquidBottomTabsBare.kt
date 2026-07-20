@@ -101,7 +101,8 @@ fun LiquidBottomTabsBare(
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
-                pressedScale = 78f / 56f,
+                // Мягче, чем 78/56 у Kyant: индикатор не «дёргается» при нажатии.
+                pressedScale = 1.12f,
                 onDragStarted = {},
                 onDragStopped = {
                     val targetIndex = targetValue.fastRoundToInt().fastCoerceIn(0, tabsCount - 1)
@@ -205,8 +206,10 @@ fun LiquidBottomTabsBare(
                     },
                     highlight = { Highlight.Ambient },
                     shadow = {
+                        // Тень только при нажатии: в покое индикатор не должен
+                        // читаться как тёмная подложка.
                         val progress = dampedDragAnimation.pressProgress
-                        Shadow(alpha = 0.15f + 0.35f * progress)
+                        Shadow(alpha = 0.35f * progress)
                     },
                     innerShadow = {
                         val progress = dampedDragAnimation.pressProgress
@@ -223,7 +226,7 @@ fun LiquidBottomTabsBare(
                         scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
                     },
                     onDrawSurface = {
-                        drawRect(Color.White.copy(alpha = 0.12f))
+                        drawRect(Color.White.copy(alpha = 0.1f))
                     }
                 )
                 .height(56f.dp)

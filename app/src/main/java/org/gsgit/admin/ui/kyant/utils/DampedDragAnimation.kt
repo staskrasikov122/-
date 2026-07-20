@@ -28,16 +28,18 @@ class DampedDragAnimation(
     val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
 ) {
 
+    // Пружины смягчены относительно оригинала Kyant (1000f/250f):
+    // меньше жёсткость — плавнее скольжение индикатора и тумблеров.
     private val valueAnimationSpec =
-        spring(1f, 1000f, visibilityThreshold)
+        spring(0.9f, 380f, visibilityThreshold)
     private val velocityAnimationSpec =
         spring(0.5f, 300f, visibilityThreshold * 10f)
     private val pressProgressAnimationSpec =
-        spring(1f, 1000f, 0.001f)
+        spring(1f, 420f, 0.001f)
     private val scaleXAnimationSpec =
-        spring(0.6f, 250f, 0.001f)
+        spring(0.7f, 170f, 0.001f)
     private val scaleYAnimationSpec =
-        spring(0.7f, 250f, 0.001f)
+        spring(0.75f, 170f, 0.001f)
 
     private val valueAnimation =
         Animatable(initialValue, visibilityThreshold)
