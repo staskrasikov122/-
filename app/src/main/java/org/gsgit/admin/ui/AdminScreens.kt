@@ -3,11 +3,11 @@ package org.gsgit.admin.ui
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -25,7 +25,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.shapes.RoundedRectangle
 import org.gsgit.admin.data.*
+import org.gsgit.admin.ui.kyant.components.AnimatedListItem
 import org.gsgit.admin.ui.kyant.components.LiquidSlider
+import org.gsgit.admin.ui.kyant.utils.LiquidMotion
+import org.gsgit.admin.ui.kyant.utils.liquidClickable
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 
@@ -221,8 +224,8 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
         } }
         item { AdminSectionLabel("история", Modifier.padding(start = 4.dp, top = 6.dp)) }
         when (val history = state.announcements) {
-            is LoadState.Ready -> if (history.value.items.isEmpty()) item { AdminCard { AdminText("рассылок пока нет", color = AdminTheme.colors.textMuted) } } else items(history.value.items, key = { it.id }) { record ->
-                AdminCard(Modifier.clickable { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
+            is LoadState.Ready -> if (history.value.items.isEmpty()) item { AdminCard { AdminText("рассылок пока нет", color = AdminTheme.colors.textMuted) } } else itemsIndexed(history.value.items, key = { _, it -> it.id }) { itemIndex, record -> AnimatedListItem(itemIndex) {
+                AdminCard(Modifier.liquidClickable(pressedScale = LiquidMotion.PressCard) { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AdminText(record.title.ifBlank { "без заголовка" }, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         AdminChip(record.status, selected = record.failed == 0, destructive = record.failed > 0)
@@ -231,7 +234,7 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
                     AdminKeyValue("получателей", record.targeted.toString())
                     AdminKeyValue("доставлено / ошибок", "${record.delivered} / ${record.failed}")
                 }
-            }
+            } }
             is LoadState.Error -> item { AdminCard { AdminText(history.message, color = AdminTheme.colors.error) } }
             else -> item { AdminSpinner("загрузка истории") }
         }
@@ -281,8 +284,8 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
             is LoadState.Ready -> {
                 item { AdminText("аккаунтов: ${response.value.logins} · устройств: ${response.value.totalDevices}", color = AdminTheme.colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp)) }
                 if (response.value.devices.isEmpty()) item { AdminCard { AdminText("устройства не найдены", color = AdminTheme.colors.textMuted) } }
-                items(response.value.devices, key = { it.login }) { group ->
-                    AdminCard(Modifier.clickable { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
+                itemsIndexed(response.value.devices, key = { _, it -> it.login }) { itemIndex, group -> AnimatedListItem(itemIndex) {
+                    AdminCard(Modifier.liquidClickable(pressedScale = LiquidMotion.PressCard) { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) { AdminText("@${group.login}", fontWeight = FontWeight.Bold); AdminText("устройств: ${group.count}", color = AdminTheme.colors.textMuted, fontSize = 10.sp) }
                             AdminText(if (group.login in expanded) "⌃" else "⌄", color = AdminTheme.colors.accent, fontSize = 16.sp)
@@ -296,7 +299,7 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
                             }
                         }
                     }
-                }
+                } }
             }
             is LoadState.Error -> item { AdminCard { AdminText(response.message, color = AdminTheme.colors.error) } }
             else -> item { AdminSpinner("загрузка устройств") }
@@ -399,12 +402,12 @@ private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
             AdminPillButton("сохранить релиз", { viewModel.saveRelease(ReleaseRecord(version.trim(), changelog.trim(), url.trim(), sha.trim(), mandatory, rollout.toIntOrNull()?.coerceIn(0,100) ?: 100)) }, Modifier.fillMaxWidth(), enabled = state.busyAction == null && version.isNotBlank())
         } }
         when (val releases = state.releases) {
-            is LoadState.Ready -> if (releases.value.items.isEmpty()) item { AdminCard { AdminText("релизов пока нет", color = AdminTheme.colors.textMuted) } } else items(releases.value.items, key = { it.version }) { release -> AdminCard {
+            is LoadState.Ready -> if (releases.value.items.isEmpty()) item { AdminCard { AdminText("релизов пока нет", color = AdminTheme.colors.textMuted) } } else itemsIndexed(releases.value.items, key = { _, it -> it.version }) { itemIndex, release -> AnimatedListItem(itemIndex) { AdminCard {
                 Row { AdminText(release.version, color = AdminTheme.colors.accent, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); if (release.mandatory) AdminChip("обязательный", destructive = true) }
                 if (release.changelog.isNotBlank()) AdminText(release.changelog, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 AdminKeyValue("раздача", "${release.rollout}%"); AdminKeyValue("опубликован", displayDate(release.publishedAt).ifBlank { "нет" })
                 AdminPillButton("опубликовать атомарно", { publish = release.version }, enabled = state.busyAction == null)
-            } }
+            } } }
             is LoadState.Error -> item { AdminCard { AdminText(releases.message, color = AdminTheme.colors.error) } }
             else -> item { AdminSpinner("загрузка релизов") }
         }
@@ -418,10 +421,10 @@ private fun AuditPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
         is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             item { AdminPillButton("обновить", viewModel::loadAudit) }
             if (audit.value.items.isEmpty()) item { AdminCard { AdminText("журнал пуст", color = AdminTheme.colors.textMuted) } }
-            items(audit.value.items, key = { it.id }) { record -> AdminCard {
+            itemsIndexed(audit.value.items, key = { _, it -> it.id }) { itemIndex, record -> AnimatedListItem(itemIndex) { AdminCard {
                 Row { AdminText(record.action, color = AdminTheme.colors.accent, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminChip(record.result, selected = record.result.equals("ok", true), destructive = !record.result.equals("ok", true)) }
                 AdminKeyValue("время", displayDate(record.at)); AdminKeyValue("IP", record.ip); if (record.meta.isNotBlank() && record.meta != "{}") AdminText(record.meta, color = AdminTheme.colors.textMuted, fontSize = 10.sp)
-            } }
+            } } }
         }
         is LoadState.Error -> AdminStatePanel(audit.message, true, viewModel::loadAudit)
         else -> AdminStatePanel("загрузка аудита")
@@ -436,7 +439,7 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
         when (val errors = state.errors) {
             is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (errors.value.isEmpty()) item { AdminCard { AdminText("серверных ошибок нет", color = AdminTheme.colors.accent) } }
-                items(errors.value, key = { it.id }) { error -> AdminCard { Row { AdminText(error.code, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminText("×${error.count}") }; AdminText(error.message); AdminKeyValue("сервис", error.service); AdminKeyValue("последняя", displayDate(error.lastAt)) } }
+                itemsIndexed(errors.value, key = { _, it -> it.id }) { itemIndex, error -> AnimatedListItem(itemIndex) { AdminCard { Row { AdminText(error.code, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminText("×${error.count}") }; AdminText(error.message); AdminKeyValue("сервис", error.service); AdminKeyValue("последняя", displayDate(error.lastAt)) } } }
             }
             is LoadState.Error -> AdminStatePanel(errors.message, true) { viewModel.loadErrors(service) }
             else -> AdminStatePanel("загрузка ошибок")
@@ -491,7 +494,7 @@ private fun GlassPanelV3() {
                                 if (selected) AdminTheme.colors.accent else Color.White.copy(alpha = 0.2f),
                                 RoundedRectangle(16.dp),
                             )
-                            .clickable { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaper = index)) },
+                            .liquidClickable(pressedScale = LiquidMotion.PressCard) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaper = index)) },
                         contentScale = ContentScale.Crop,
                     )
                 }

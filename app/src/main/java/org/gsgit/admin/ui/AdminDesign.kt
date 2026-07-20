@@ -36,7 +36,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.lerp
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.colorControls
@@ -53,6 +52,8 @@ import org.gsgit.admin.ui.kyant.components.GlassBottomTabBar
 import org.gsgit.admin.ui.kyant.components.GlassTabItem
 import org.gsgit.admin.ui.kyant.components.LiquidToggle
 import org.gsgit.admin.ui.kyant.utils.InteractiveHighlight
+import org.gsgit.admin.ui.kyant.utils.LiquidMotion
+import org.gsgit.admin.ui.kyant.utils.liquidClickable
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.liquid.RegisterLiquidOverlay
 import org.gsgit.admin.ui.theme.AdminFont
@@ -196,7 +197,9 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
     val surface = Color(0xFF121212).copy(alpha = surfaceAlpha)
     val cornerRadius = (if (elevated) glass.cardCornerRadius * 1.5f else glass.cardCornerRadius).dp
     val backdrop = LocalLiquidBackdrop.current
-    val contentBackdrop = rememberLayerBackdrop()
+    // Карточка НЕ экспортирует свой слой (правило кита: не плодить layerBackdrop
+    // по экрану — каждый экспорт это полный захват в текстуру на кадр).
+    // Вложенные стеклянные контролы преломляют те же обои сцены.
     Column(
         modifier
             .fillMaxWidth()
@@ -215,13 +218,11 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
                     )
                 },
                 highlight = { Highlight.Plain },
-                exportedBackdrop = contentBackdrop,
                 onDrawSurface = { drawRect(surface) },
             )
             .padding(horizontal = if (elevated) 24.dp else 18.dp, vertical = if (elevated) 22.dp else 16.dp),
-    ) {
-        CompositionLocalProvider(LocalLiquidBackdrop provides contentBackdrop) { content() }
-    }
+        content = content,
+    )
 }
 
 /**
@@ -345,8 +346,8 @@ fun AdminTextAction(
     }
     Row(
         modifier
+            .liquidClickable(enabled = enabled, pressedScale = LiquidMotion.PressButton, onClick = onClick)
             .clip(Capsule())
-            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center,
@@ -372,6 +373,7 @@ fun AdminIconAction(
     Box(
         modifier
             .alpha(if (enabled) 1f else 0.5f)
+            .liquidClickable(enabled = enabled, pressedScale = LiquidMotion.PressIcon, onClick = onClick)
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { Capsule() },
@@ -389,7 +391,6 @@ fun AdminIconAction(
                 },
             )
             .clip(Capsule())
-            .clickable(enabled = enabled, onClick = onClick)
             .size(42.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -458,7 +459,7 @@ fun AdminCheckRow(label: String, checked: Boolean, onToggle: () -> Unit, descrip
     ) {
         LiquidToggle({ checked }, { if (it != checked) onToggle() }, LocalLiquidBackdrop.current)
         Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f).clickable(onClick = onToggle).padding(vertical = 4.dp)) {
+        Column(Modifier.weight(1f).liquidClickable(pressedScale = LiquidMotion.PressCard, onClick = onToggle).padding(vertical = 4.dp)) {
             AdminText(label, fontSize = 14.sp)
             if (!description.isNullOrBlank()) AdminText(description, color = colors.textMuted, fontSize = 11.sp)
         }
@@ -477,6 +478,7 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
     }
     Row(
         Modifier
+            .then(if (onClick != null) Modifier.liquidClickable(pressedScale = LiquidMotion.PressButton, onClick = onClick) else Modifier)
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { Capsule() },
@@ -494,7 +496,6 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                 },
             )
             .clip(Capsule())
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
