@@ -31,6 +31,8 @@ data class GlassSettings(
     val vibrancy: Boolean = true,
     val brightness: Float = 0f,            // -0.5..0.5
     val saturation: Float = 1.5f,          // 0..2
+    // Акцент интерфейса (кнопки, чипы, метрики, ползунки, вкладки)
+    val accentColor: Int = 0xFF0091FF.toInt(),
     // Кнопки, чипы, круглые действия
     val tintAlpha: Float = 0.6f,           // 0.2..1 — плотность цветного стекла
     val controlShadow: Float = 0.3f,       // 0..1 — внешняя тень
@@ -53,6 +55,10 @@ data class GlassSettings(
     val tintChroma: Float = 0f,            // 0..0.6 — 0 = нейтрально-тёмный
     // Скрим обоев
     val wallpaperScrim: Float = 0f,        // 0..0.6 — тёмный слой над обоями
+    // Стекло контролов (дефолты совпадают с панелями — «кнопки как блоки»)
+    val controlLensHeight: Float = 24f,    // dp, 0..48
+    val controlLensAmount: Float = 48f,    // dp, 0..96
+    val controlBlur: Float = 8f,           // dp, 0..16
     // Геометрия теней контролов
     val controlShadowRadius: Float = 10f,  // dp, 0..24
     val controlInnerRadius: Float = 6f,    // dp, 0..16
@@ -90,6 +96,7 @@ object GlassSettingsStore {
             vibrancy = p.getBoolean("vibrancy", d.vibrancy),
             brightness = p.getFloat("brightness", d.brightness),
             saturation = p.getFloat("saturation", d.saturation),
+            accentColor = p.getInt("accentColor", d.accentColor),
             tintAlpha = p.getFloat("tintAlpha", d.tintAlpha),
             controlShadow = p.getFloat("controlShadow", d.controlShadow),
             controlInnerShadow = p.getFloat("controlInnerShadow", d.controlInnerShadow),
@@ -105,6 +112,9 @@ object GlassSettingsStore {
             tintHue = p.getFloat("tintHue", d.tintHue),
             tintChroma = p.getFloat("tintChroma", d.tintChroma),
             wallpaperScrim = p.getFloat("wallpaperScrim", d.wallpaperScrim),
+            controlLensHeight = p.getFloat("controlLensHeight", d.controlLensHeight),
+            controlLensAmount = p.getFloat("controlLensAmount", d.controlLensAmount),
+            controlBlur = p.getFloat("controlBlur", d.controlBlur),
             controlShadowRadius = p.getFloat("controlShadowRadius", d.controlShadowRadius),
             controlInnerRadius = p.getFloat("controlInnerRadius", d.controlInnerRadius),
             edgeBlurTop = p.getFloat("edgeBlurTop", d.edgeBlurTop),
@@ -137,6 +147,7 @@ object GlassSettingsStore {
             putBoolean("vibrancy", settings.vibrancy)
             putFloat("brightness", settings.brightness)
             putFloat("saturation", settings.saturation)
+            putInt("accentColor", settings.accentColor)
             putFloat("tintAlpha", settings.tintAlpha)
             putFloat("controlShadow", settings.controlShadow)
             putFloat("controlInnerShadow", settings.controlInnerShadow)
@@ -152,6 +163,9 @@ object GlassSettingsStore {
             putFloat("tintHue", settings.tintHue)
             putFloat("tintChroma", settings.tintChroma)
             putFloat("wallpaperScrim", settings.wallpaperScrim)
+            putFloat("controlLensHeight", settings.controlLensHeight)
+            putFloat("controlLensAmount", settings.controlLensAmount)
+            putFloat("controlBlur", settings.controlBlur)
             putFloat("controlShadowRadius", settings.controlShadowRadius)
             putFloat("controlInnerRadius", settings.controlInnerRadius)
             putFloat("edgeBlurTop", settings.edgeBlurTop)

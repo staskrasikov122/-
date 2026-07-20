@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -504,11 +505,22 @@ private fun GlassPanelV3() {
         }
         AdminExpandableSection("Контролы", open == "Контролы", { toggle("Контролы") }) {
             GlassSlider("плотность цвета", "%.2f", 0.2f..1f, { GlassSettingsStore.state.value.tintAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintAlpha = it)) }
+            GlassSlider("линза: высота", "%.0f dp", 0f..48f, { GlassSettingsStore.state.value.controlLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlLensHeight = it)) }
+            GlassSlider("линза: сила", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.controlLensAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlLensAmount = it)) }
+            GlassSlider("размытие", "%.0f dp", 0f..16f, { GlassSettingsStore.state.value.controlBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlBlur = it)) }
             GlassSlider("внешняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadow = it)) }
             GlassSlider("тень: радиус", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.controlShadowRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadowRadius = it)) }
             GlassSlider("внутренняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlInnerShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerShadow = it)) }
             GlassSlider("вн. тень: радиус", "%.0f dp", 0f..16f, { GlassSettingsStore.state.value.controlInnerRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerRadius = it)) }
             GlassSlider("окантовка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.controlStroke }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlStroke = it)) }
+        }
+        AdminExpandableSection("Цвет акцента", open == "Цвет акцента", { toggle("Цвет акцента") }) {
+            Spacer(Modifier.height(6.dp))
+            AccentColorWheel(
+                color = Color(GlassSettingsStore.state.value.accentColor),
+                onColorChange = { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(accentColor = it.toArgb())) },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         AdminExpandableSection("Нижний бар", open == "Нижний бар", { toggle("Нижний бар") }) {
             GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.barLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensHeight = it)) }

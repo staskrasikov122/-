@@ -8,12 +8,16 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import org.gsgit.admin.R
+import org.gsgit.admin.data.GlassSettingsStore
 
 @Immutable
 data class AdminColors(
@@ -63,7 +67,13 @@ val AdminFont = FontFamily(
 
 @Composable
 fun GsGitAdminTheme(content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalAdminColors provides AdminDarkColors) {
+    // Динамический акцент из настроек стекла; derivedStateOf — рекомпозиция
+    // темы только при фактической смене цвета, а не любого параметра.
+    val accentArgb by remember { derivedStateOf { GlassSettingsStore.state.value.accentColor } }
+    val accent = Color(accentArgb)
+    CompositionLocalProvider(
+        LocalAdminColors provides AdminDarkColors.copy(accent = accent, accentDim = accent.copy(alpha = 0.8f)),
+    ) {
         Box(Modifier.fillMaxSize().background(AdminDarkColors.background)) { content() }
     }
 }

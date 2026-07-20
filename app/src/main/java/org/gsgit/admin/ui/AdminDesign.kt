@@ -311,10 +311,10 @@ private fun AdminGlassCapsule(
                     val g = GlassSettingsStore.state.value
                     if (g.vibrancy) vibrancy()
                     colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
-                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
+                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
                     lens(
-                        g.refractionHeight.dp.toPx(),
-                        g.refractionAmount.dp.toPx(),
+                        g.controlLensHeight.dp.toPx(),
+                        g.controlLensAmount.dp.toPx(),
                         depthEffect = g.depthEffect,
                         chromaticAberration = g.chromaticAberration,
                     )
@@ -466,10 +466,10 @@ fun AdminIconAction(
                     val g = GlassSettingsStore.state.value
                     if (g.vibrancy) vibrancy()
                     colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
-                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
+                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
                     lens(
-                        g.refractionHeight.dp.toPx() * 0.85f,
-                        g.refractionAmount.dp.toPx() * 0.85f,
+                        g.controlLensHeight.dp.toPx() * 0.85f,
+                        g.controlLensAmount.dp.toPx() * 0.85f,
                         depthEffect = g.depthEffect,
                         chromaticAberration = g.chromaticAberration,
                     )
@@ -608,10 +608,10 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                     val g = GlassSettingsStore.state.value
                     if (g.vibrancy) vibrancy()
                     colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
-                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
+                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
                     lens(
-                        g.refractionHeight.dp.toPx() * 0.66f,
-                        g.refractionAmount.dp.toPx() * 0.66f,
+                        g.controlLensHeight.dp.toPx() * 0.66f,
+                        g.controlLensAmount.dp.toPx() * 0.66f,
                         depthEffect = g.depthEffect,
                         chromaticAberration = g.chromaticAberration,
                     )

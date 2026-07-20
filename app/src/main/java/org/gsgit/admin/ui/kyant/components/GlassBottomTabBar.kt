@@ -76,7 +76,6 @@ data class GlassTabItem(val icon: ImageVector, val label: String)
 
 private val BarHeight = 62.dp
 private val CapsuleHeight = 52.dp
-private val AccentColor = Color(0xFF0091FF)
 private val InactiveColor = Color(0xFF999999)
 
 /**
@@ -93,6 +92,9 @@ fun GlassBottomTabBar(
     tabs: List<GlassTabItem>,
     modifier: Modifier = Modifier,
 ) {
+    // Акцент из настроек; derivedStateOf — бар не рекомпозится от прочих параметров.
+    val accentArgb by remember { androidx.compose.runtime.derivedStateOf { GlassSettingsStore.state.value.accentColor } }
+    val accentColor = Color(accentArgb)
     val tabsBackdrop = rememberLayerBackdrop()
 
     Box(modifier.fillMaxWidth().padding(bottom = 20.dp), contentAlignment = Alignment.BottomCenter) {
@@ -163,7 +165,7 @@ fun GlassBottomTabBar(
                         onDrawSurface = { drawRect(Color.Black.copy(alpha = GlassSettingsStore.state.value.barSurfaceAlpha)) }
                     ).then(interactiveHighlight.modifier).height(BarHeight).fillMaxWidth().padding(4.dp),
                 verticalAlignment = Alignment.CenterVertically
-            ) { tabs.forEachIndexed { i, tab -> GlassTab { TabContent(tab, i == selectedTab) } } }
+            ) { tabs.forEachIndexed { i, tab -> GlassTab { TabContent(tab, i == selectedTab, accentColor) } } }
 
             // Слой 2: скрытая акцентная копия — проступает сквозь капсулу.
             Row(
@@ -174,9 +176,9 @@ fun GlassBottomTabBar(
                         highlight = { Highlight.Default.copy(alpha = dampedDragAnimation.pressProgress) },
                         onDrawSurface = { drawRect(Color.Black.copy(alpha = GlassSettingsStore.state.value.barSurfaceAlpha)) }
                     ).then(interactiveHighlight.modifier).height(CapsuleHeight).fillMaxWidth().padding(horizontal = 4.dp)
-                    .graphicsLayer(colorFilter = ColorFilter.tint(AccentColor)),
+                    .graphicsLayer(colorFilter = ColorFilter.tint(accentColor)),
                 verticalAlignment = Alignment.CenterVertically
-            ) { tabs.forEachIndexed { i, tab -> GlassTab { TabContent(tab, i == selectedTab) } } }
+            ) { tabs.forEachIndexed { i, tab -> GlassTab { TabContent(tab, i == selectedTab, accentColor) } } }
 
             // Тап-детектор по всей ширине бара.
             Box(Modifier.height(BarHeight).fillMaxWidth().pointerInput(tabs.size) {
@@ -218,8 +220,8 @@ private fun RowScope.GlassTab(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun TabContent(item: GlassTabItem, isSelected: Boolean) {
-    val color by animateColorAsState(if (isSelected) AccentColor else InactiveColor, tween(200), label = "nc")
+private fun TabContent(item: GlassTabItem, isSelected: Boolean, accentColor: Color) {
+    val color by animateColorAsState(if (isSelected) accentColor else InactiveColor, tween(200), label = "nc")
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Image(
             rememberVectorPainter(item.icon),
