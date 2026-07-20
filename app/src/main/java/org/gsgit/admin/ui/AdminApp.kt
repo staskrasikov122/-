@@ -68,7 +68,7 @@ fun AdminApp(viewModel: AdminViewModel) {
         toast?.let { message ->
             AdminToast(
                 message,
-                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 94.dp),
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 104.dp),
             )
         }
     }
@@ -182,7 +182,7 @@ private fun biometricError(context: Context, code: Int): String = when (code) {
 
 private val adminNavigation = listOf(
     AdminNavItem(Section.Dashboard, "обзор", "◉"),
-    AdminNavItem(Section.AppConfig, "конфиг", "⌁"),
+    AdminNavItem(Section.AppConfig, "конфиг", "≡"),
     AdminNavItem(Section.Announce, "пуши", "⌁"),
     AdminNavItem(Section.Devices, "устройства", "◇"),
     AdminNavItem(Section.Operations, "операции", "⚙"),

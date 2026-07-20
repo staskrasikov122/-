@@ -31,15 +31,15 @@ data class AdminColors(
 )
 
 val AdminDarkColors = AdminColors(
-    background = Color(0xFFE7F7FA),
-    surface = Color(0x66FAFAFA),
-    surfaceElevated = Color(0x99FAFAFA),
-    border = Color(0x99FFFFFF),
+    background = Color(0xFFE9F2F6),
+    surface = Color(0xB8FFFFFF),
+    surfaceElevated = Color(0xE3FFFFFF),
+    border = Color(0x1A15202B),
     accent = Color(0xFF0088FF),
     accentDim = Color(0xFF0066CC),
-    textPrimary = Color(0xFF101820),
+    textPrimary = Color(0xFF0F1720),
     textSecondary = Color(0xFF344054),
-    textMuted = Color(0xFF667085),
+    textMuted = Color(0xFF5B6B7C),
     warning = Color(0xFF9A5A00),
     error = Color(0xFFC6283D),
 )

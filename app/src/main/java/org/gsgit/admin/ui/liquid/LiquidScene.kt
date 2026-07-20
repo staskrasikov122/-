@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -60,7 +61,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
         LocalLiquidBackdrop provides backdrop,
         LocalLiquidOverlay provides overlayState,
     ) {
-        Box(Modifier.fillMaxSize().background(Color(0xFFE7F7FA))) {
+        Box(Modifier.fillMaxSize().background(Color(0xFFE9F2F6))) {
             // Source and consumers are siblings. This ordering is intentional and mandatory.
             LiquidSceneBackground(Modifier.fillMaxSize().layerBackdrop(backdrop))
             content()
@@ -69,7 +70,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0x3B29293A))
+                        .background(Color(0x40202834))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -85,12 +86,27 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
 
 @Composable
 private fun LiquidSceneBackground(modifier: Modifier = Modifier) {
-    Image(
-        painter = painterResource(R.drawable.kyant_wallpaper_light),
-        contentDescription = null,
-        modifier = modifier,
-        contentScale = ContentScale.Crop,
-    )
+    Box(modifier) {
+        Image(
+            painter = painterResource(R.drawable.kyant_wallpaper_light),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        // Мягкий скрим: приглушает обои, чтобы контент и заголовки оставались читаемыми,
+        // при этом стеклянные элементы преломляют уже "успокоенный" фон.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color(0xA6F4F9FB),
+                        0.4f to Color(0x66F4F9FB),
+                        1f to Color(0x8CF4F9FB),
+                    ),
+                ),
+        )
+    }
 }
 
 @Composable

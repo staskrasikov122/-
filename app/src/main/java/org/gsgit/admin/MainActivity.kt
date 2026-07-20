@@ -13,9 +13,10 @@ import org.gsgit.admin.ui.theme.GsGitAdminTheme
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Светлые обои + скрим: системные иконки должны быть тёмными.
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
         setContent {
             GsGitAdminTheme {

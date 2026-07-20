@@ -126,16 +126,27 @@ fun AppConfigV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var rollbackTarget by rememberSaveable { mutableStateOf<Int?>(null) }
     val changes = remember(serverConfig, config) { configChanges(serverConfig, config) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AdminPageTitle("конфигурация", "проверка, предпросмотр и безопасный откат")
-        AdminField(config.maintenanceSoon, { config = config.copy(maintenanceSoon = it) }, "Скоро техработы", "Пусто — предупреждение отключено", 2)
-        AdminField(config.maintenance, { config = config.copy(maintenance = it) }, "Техработы сейчас", "Полная блокировка клиентов", 3)
-        AdminField(config.latestVersion, { config = config.copy(latestVersion = it) }, "Последняя версия", "Формат x.y.z")
-        AdminField(config.minVersion, { config = config.copy(minVersion = it) }, "Минимальная версия", "Старые клиенты будут заблокированы")
-        AdminField(config.changelog, { config = config.copy(changelog = it) }, "Что нового", "Описание изменений", 5)
-        AdminField(config.downloadUrl, { config = config.copy(downloadUrl = it) }, "Ссылка на APK", "HTTPS-адрес загрузки")
-        AdminField(reason, { reason = it }, "Причина изменения", "Попадёт в ревизию и аудит", 2)
-        AdminPillButton("показать и сохранить ${changes.size} изм.", { preview = true }, Modifier.fillMaxWidth(), enabled = !state.savingConfig && changes.isNotEmpty())
+        AdminCard {
+            AdminSectionLabel("параметры клиентов")
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(config.maintenanceSoon, { config = config.copy(maintenanceSoon = it) }, "Скоро техработы", "Пусто — предупреждение отключено", 2)
+                AdminField(config.maintenance, { config = config.copy(maintenance = it) }, "Техработы сейчас", "Полная блокировка клиентов", 3)
+                AdminField(config.latestVersion, { config = config.copy(latestVersion = it) }, "Последняя версия", "Формат x.y.z")
+                AdminField(config.minVersion, { config = config.copy(minVersion = it) }, "Минимальная версия", "Старые клиенты будут заблокированы")
+                AdminField(config.changelog, { config = config.copy(changelog = it) }, "Что нового", "Описание изменений", 5)
+                AdminField(config.downloadUrl, { config = config.copy(downloadUrl = it) }, "Ссылка на APK", "HTTPS-адрес загрузки")
+            }
+        }
+        AdminCard {
+            AdminSectionLabel("применение")
+            Spacer(Modifier.height(10.dp))
+            AdminField(reason, { reason = it }, "Причина изменения", "Попадёт в ревизию и аудит", 2)
+            Spacer(Modifier.height(12.dp))
+            AdminPillButton("показать и сохранить ${changes.size} изм.", { preview = true }, Modifier.fillMaxWidth(), enabled = !state.savingConfig && changes.isNotEmpty())
+        }
         AdminCard {
             AdminSectionLabel("история конфигурации")
             Spacer(Modifier.height(7.dp))
@@ -190,13 +201,16 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
         item { AdminPageTitle("пуши", "рассылка, история и повтор ошибок") }
         item { AdminCard {
             AdminSectionLabel("новая рассылка")
-            Spacer(Modifier.height(8.dp))
-            AdminField(title, { title = it }, "Заголовок", "Обязательно")
-            AdminField(body, { body = it }, "Текст", "Обязательно", 4)
-            AdminField(url, { url = it }, "Ссылка", "Необязательно")
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(title, { title = it }, "Заголовок", "Обязательно")
+                AdminField(body, { body = it }, "Текст", "Обязательно", 4)
+                AdminField(url, { url = it }, "Ссылка", "Необязательно")
+            }
+            Spacer(Modifier.height(12.dp))
             AdminPillButton("отправить на ${recipients ?: 0} устройств", { sendConfirm = true }, Modifier.fillMaxWidth(), enabled = recipients != null && title.isNotBlank() && body.isNotBlank() && !state.sendingAnnouncement)
         } }
-        item { AdminSectionLabel("история") }
+        item { AdminSectionLabel("история", Modifier.padding(start = 4.dp, top = 6.dp)) }
         when (val history = state.announcements) {
             is LoadState.Ready -> if (history.value.items.isEmpty()) item { AdminCard { AdminText("рассылок пока нет", color = AdminTheme.colors.textMuted) } } else items(history.value.items, key = { it.id }) { record ->
                 AdminCard(Modifier.clickable { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
@@ -249,12 +263,14 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
         item { AdminPageTitle("устройства", "диагностика и адресные действия") }
         item { AdminCard {
             AdminTextField(query, { query = it }, label = "Фильтр по логину", placeholder = "часть логина")
+            Spacer(Modifier.height(4.dp))
             AdminCheckRow("Только активные пуши", activeOnly, { activeOnly = !activeOnly })
+            Spacer(Modifier.height(4.dp))
             AdminPillButton("найти", { viewModel.loadDevices(query, activeOnly) }, Modifier.fillMaxWidth())
         } }
         when (val response = state.devices) {
             is LoadState.Ready -> {
-                item { AdminText("аккаунтов: ${response.value.logins} · устройств: ${response.value.totalDevices}", color = AdminTheme.colors.textMuted, fontSize = 10.sp) }
+                item { AdminText("аккаунтов: ${response.value.logins} · устройств: ${response.value.totalDevices}", color = AdminTheme.colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp)) }
                 if (response.value.devices.isEmpty()) item { AdminCard { AdminText("устройства не найдены", color = AdminTheme.colors.textMuted) } }
                 items(response.value.devices, key = { it.login }) { group ->
                     AdminCard(Modifier.clickable { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
@@ -344,8 +360,13 @@ private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
         }
         AdminCard {
             AdminSectionLabel("запланировать")
-            AdminText("Время ISO 8601: 2026-07-20T01:00:00Z", color = AdminTheme.colors.textMuted, fontSize = 10.sp)
-            AdminField(starts, { starts = it }, "Начало", "ISO 8601"); AdminField(ends, { ends = it }, "Окончание", "ISO 8601"); AdminField(message, { message = it }, "Сообщение", "Увидят пользователи", 3)
+            Spacer(Modifier.height(4.dp))
+            AdminText("Формат времени ISO 8601, например 2026-07-20T01:00:00Z", color = AdminTheme.colors.textMuted, fontSize = 10.sp)
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(starts, { starts = it }, "Начало", "ISO 8601"); AdminField(ends, { ends = it }, "Окончание", "ISO 8601"); AdminField(message, { message = it }, "Сообщение", "Увидят пользователи", 3)
+            }
+            Spacer(Modifier.height(12.dp))
             AdminPillButton("сохранить расписание", { viewModel.scheduleMaintenance(starts, ends, message) }, Modifier.fillMaxWidth(), enabled = state.busyAction == null && starts.isNotBlank() && ends.isNotBlank() && message.isNotBlank())
         }
     }
@@ -358,8 +379,13 @@ private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminCard {
             AdminSectionLabel("добавить или обновить релиз")
-            AdminField(version, { version = it }, "Версия", "x.y.z"); AdminField(changelog, { changelog = it }, "Что нового", "Необязательно", 4); AdminField(url, { url = it }, "URL", "Ссылка на APK"); AdminField(sha, { sha = it }, "SHA-256", "64 шестнадцатеричных символа")
-            AdminCheckRow("Обязательное обновление", mandatory, { mandatory = !mandatory }); AdminField(rollout, { rollout = it.filter(Char::isDigit).take(3) }, "Процент раздачи", "0–100", keyboardType = KeyboardType.Number)
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(version, { version = it }, "Версия", "x.y.z"); AdminField(changelog, { changelog = it }, "Что нового", "Необязательно", 4); AdminField(url, { url = it }, "URL", "Ссылка на APK"); AdminField(sha, { sha = it }, "SHA-256", "64 шестнадцатеричных символа")
+            }
+            AdminCheckRow("Обязательное обновление", mandatory, { mandatory = !mandatory })
+            AdminField(rollout, { rollout = it.filter(Char::isDigit).take(3) }, "Процент раздачи", "0–100", keyboardType = KeyboardType.Number)
+            Spacer(Modifier.height(12.dp))
             AdminPillButton("сохранить релиз", { viewModel.saveRelease(ReleaseRecord(version.trim(), changelog.trim(), url.trim(), sha.trim(), mandatory, rollout.toIntOrNull()?.coerceIn(0,100) ?: 100)) }, Modifier.fillMaxWidth(), enabled = state.busyAction == null && version.isNotBlank())
         } }
         when (val releases = state.releases) {
@@ -442,11 +468,11 @@ private fun TypedConfirmationDialog(title: String, description: String, required
 
 @Composable
 private fun AdminField(value: String, onChange: (String) -> Unit, label: String, help: String, minLines: Int = 1, keyboardType: KeyboardType = KeyboardType.Text) {
-    AdminTextField(value, onChange, label = label, placeholder = help, minLines = minLines, maxLines = if (minLines == 1) 1 else 10, keyboardOptions = KeyboardOptions(keyboardType = keyboardType)); Spacer(Modifier.height(3.dp)); AdminText(help, color = AdminTheme.colors.textMuted, fontSize = 9.sp)
+    AdminTextField(value, onChange, label = label, placeholder = help, minLines = minLines, maxLines = if (minLines == 1) 1 else 10, keyboardOptions = KeyboardOptions(keyboardType = keyboardType))
 }
 
 @Composable
-private fun AdminMetricCard(label: String, value: String, modifier: Modifier = Modifier) { AdminCard(modifier) { AdminText(label, color = AdminTheme.colors.textMuted, fontSize = 9.sp); AdminText(value, color = AdminTheme.colors.accent, fontSize = 26.sp, fontWeight = FontWeight.Bold) } }
+private fun AdminMetricCard(label: String, value: String, modifier: Modifier = Modifier) { AdminCard(modifier) { AdminText(label, color = AdminTheme.colors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Medium); Spacer(Modifier.height(2.dp)); AdminText(value, color = AdminTheme.colors.accent, fontSize = 24.sp, fontWeight = FontWeight.Bold) } }
 
 @Composable
 private fun AdminStatePanel(message: String, error: Boolean = false, retry: (() -> Unit)? = null) { Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) { AdminCard(Modifier.widthIn(max = 440.dp)) { if (error) AdminText("! $message", color = AdminTheme.colors.error) else AdminSpinner(message); if (retry != null) { Spacer(Modifier.height(9.dp)); AdminPillButton("повторить", retry) } } } }
