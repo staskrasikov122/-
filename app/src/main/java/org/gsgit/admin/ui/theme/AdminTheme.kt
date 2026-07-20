@@ -31,17 +31,17 @@ data class AdminColors(
 )
 
 val AdminDarkColors = AdminColors(
-    background = Color(0xFF000000),
-    surface = Color(0xFF0A0A0A),
-    surfaceElevated = Color(0xFF141414),
-    border = Color(0xFF1F1F1F),
-    accent = Color(0xFFA8D982),
-    accentDim = Color(0xFF6B8C54),
-    textPrimary = Color(0xFFE0E0E0),
-    textSecondary = Color(0xFF999999),
-    textMuted = Color(0xFF5C5C5C),
-    warning = Color(0xFFE5C07B),
-    error = Color(0xFFE06C75),
+    background = Color(0xFFE7F7FA),
+    surface = Color(0x66FAFAFA),
+    surfaceElevated = Color(0x99FAFAFA),
+    border = Color(0x99FFFFFF),
+    accent = Color(0xFF0088FF),
+    accentDim = Color(0xFF0066CC),
+    textPrimary = Color(0xFF101820),
+    textSecondary = Color(0xFF344054),
+    textMuted = Color(0xFF667085),
+    warning = Color(0xFF9A5A00),
+    error = Color(0xFFC6283D),
 )
 
 val LocalAdminColors = compositionLocalOf { AdminDarkColors }

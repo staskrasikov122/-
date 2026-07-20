@@ -17,8 +17,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.text.TextStyle
@@ -31,30 +29,23 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.util.fastCoerceAtMost
-import androidx.compose.ui.util.lerp
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
-import com.kyant.shapes.Capsule
+import com.kyant.shapes.RoundedRectangle
 import kotlinx.coroutines.delay
-import org.gsgit.admin.ui.liquid.KyantInteractiveHighlight
-import org.gsgit.admin.ui.liquid.KyantLiquidBottomTab
-import org.gsgit.admin.ui.liquid.KyantLiquidBottomTabs
-import org.gsgit.admin.ui.liquid.KyantLiquidToggle
-import org.gsgit.admin.ui.liquid.LiquidGlassStyle
+import org.gsgit.admin.ui.kyant.components.LiquidBottomTab
+import org.gsgit.admin.ui.kyant.components.LiquidBottomTabs
+import org.gsgit.admin.ui.kyant.components.LiquidButton
+import org.gsgit.admin.ui.kyant.components.LiquidToggle
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.liquid.RegisterLiquidOverlay
-import org.gsgit.admin.ui.liquid.liquidGlass
 import org.gsgit.admin.ui.theme.AdminTheme
 import org.gsgit.admin.ui.theme.JetBrainsMono
-import kotlin.math.abs
-import kotlin.math.atan2
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.math.tanh
 
 internal val AdminControlRadius = 24.dp
 
@@ -95,24 +86,35 @@ fun AdminIcon(imageVector: ImageVector, description: String?, modifier: Modifier
 
 @Composable
 fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
-    val colors = AdminTheme.colors
     val backdrop = LocalLiquidBackdrop.current
+    val contentBackdrop = rememberLayerBackdrop()
     Column(
         modifier
             .fillMaxWidth()
-            .liquidGlass(
-                backdrop,
-                LiquidGlassStyle(
-                    cornerRadius = if (elevated) 32.dp else 24.dp,
-                    blurRadius = if (elevated) 14.dp else 8.dp,
-                    refractionHeight = if (elevated) 28.dp else 18.dp,
-                    refractionAmount = if (elevated) 44.dp else 30.dp,
-                    surfaceColor = if (elevated) Color(0xA61A1C22) else Color(0x70101418),
-                ),
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { RoundedRectangle(if (elevated) 48.dp else 32.dp) },
+                effects = {
+                    if (elevated) {
+                        colorControls(brightness = 0.2f, saturation = 1.5f)
+                        blur(16.dp.toPx())
+                        lens(24.dp.toPx(), 48.dp.toPx(), depthEffect = true)
+                    } else {
+                        vibrancy()
+                        blur(4.dp.toPx())
+                        lens(16.dp.toPx(), 32.dp.toPx())
+                    }
+                },
+                highlight = { Highlight.Plain },
+                exportedBackdrop = contentBackdrop,
+                onDrawSurface = {
+                    drawRect(Color.White.copy(alpha = if (elevated) 0.6f else 0.5f))
+                },
             )
             .padding(if (elevated) 20.dp else 16.dp),
-        content = content,
-    )
+    ) {
+        CompositionLocalProvider(LocalLiquidBackdrop provides contentBackdrop) { content() }
+    }
 }
 
 @Composable
@@ -132,52 +134,27 @@ fun AdminPillButton(
         accent -> colors.accent
         else -> colors.textSecondary
     }
-    val scope = rememberCoroutineScope()
-    val highlight = remember(scope) { KyantInteractiveHighlight(scope) }
-    Row(
-        modifier
-            .alpha(if (enabled) 1f else 0.42f)
-            .drawBackdrop(
-                backdrop = backdrop,
-                shape = { Capsule() },
-                effects = {
-                    vibrancy()
-                    blur(2.dp.toPx())
-                    lens(12.dp.toPx(), 24.dp.toPx())
-                },
-                layerBlock = if (enabled) {
-                    {
-                        val width = size.width
-                        val height = size.height
-                        val progress = highlight.pressProgress
-                        val scale = lerp(1f, 1f + 4.dp.toPx() / size.height, progress)
-                        val maxOffset = size.minDimension
-                        val offset = highlight.offset
-                        translationX = maxOffset * tanh(0.05f * offset.x / maxOffset)
-                        translationY = maxOffset * tanh(0.05f * offset.y / maxOffset)
-                        val dragScale = 4.dp.toPx() / size.height
-                        val angle = atan2(offset.y, offset.x)
-                        scaleX = scale + dragScale * abs(cos(angle) * offset.x / size.maxDimension) * (width / height).fastCoerceAtMost(1f)
-                        scaleY = scale + dragScale * abs(sin(angle) * offset.y / size.maxDimension) * (height / width).fastCoerceAtMost(1f)
-                    }
-                } else null,
-                highlight = { Highlight.Plain },
-                onDrawSurface = {
-                    if (tint.isSpecified) {
-                        drawRect(tint, blendMode = BlendMode.Hue)
-                        drawRect(tint.copy(alpha = if (destructive) 0.38f else 0.22f))
-                    }
-                    drawRect(Color(0x52101418))
-                },
-            )
-            .clickable(interactionSource = null, indication = null, enabled = enabled, onClick = onClick)
-            .then(if (enabled) Modifier.then(highlight.modifier).then(highlight.gestureModifier) else Modifier)
-            .heightIn(min = 48.dp)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
+    LiquidButton(
+        onClick = { if (enabled) onClick() },
+        backdrop = backdrop,
+        modifier = modifier.alpha(if (enabled) 1f else 0.42f),
+        isInteractive = enabled,
+        tint = if (accent || destructive) tint else Color.Unspecified,
+        surfaceColor = if (accent || destructive) Color.Unspecified else Color.White.copy(alpha = 0.3f),
     ) {
-        AdminText(label, color = if (enabled) colors.textPrimary else colors.textMuted, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
+        AdminText(
+            label,
+            color = when {
+                !enabled -> colors.textMuted
+                accent || destructive -> Color.White
+                else -> colors.textPrimary
+            },
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -196,16 +173,15 @@ fun AdminTextAction(
         destructive -> colors.error
         else -> colors.accent
     }
-    Box(
-        modifier
-            .liquidGlass(
-                backdrop,
-                LiquidGlassStyle(18.dp, 3.dp, 8.dp, 14.dp, Color(0x38101418), tint.copy(alpha = 0.25f)),
-            )
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        contentAlignment = Alignment.Center,
-    ) { AdminText(label, color = tint, fontWeight = FontWeight.Medium, maxLines = 1) }
+    LiquidButton(
+        onClick = { if (enabled) onClick() },
+        backdrop = backdrop,
+        modifier = modifier.alpha(if (enabled) 1f else 0.42f),
+        isInteractive = enabled,
+        surfaceColor = Color.White.copy(alpha = 0.3f),
+    ) {
+        AdminText(label, color = tint, fontWeight = FontWeight.Medium, maxLines = 1)
+    }
 }
 
 @Composable
@@ -232,9 +208,16 @@ fun AdminTextField(
             Modifier
                 .fillMaxWidth()
                 .heightIn(min = 40.dp)
-                .liquidGlass(
-                    backdrop,
-                    LiquidGlassStyle(18.dp, 4.dp, 10.dp, 18.dp, Color(0x54101418)),
+                .drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { RoundedRectangle(18.dp) },
+                    effects = {
+                        vibrancy()
+                        blur(4.dp.toPx())
+                        lens(16.dp.toPx(), 32.dp.toPx())
+                    },
+                    highlight = { Highlight.Plain },
+                    onDrawSurface = { drawRect(Color.White.copy(alpha = 0.5f)) },
                 )
                 .padding(horizontal = 14.dp, vertical = 11.dp),
             verticalAlignment = if (maxLines == 1) Alignment.CenterVertically else Alignment.Top,
@@ -267,7 +250,7 @@ fun AdminCheckRow(label: String, checked: Boolean, onToggle: () -> Unit, descrip
         Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        KyantLiquidToggle({ checked }, { if (it != checked) onToggle() }, LocalLiquidBackdrop.current)
+        LiquidToggle({ checked }, { if (it != checked) onToggle() }, LocalLiquidBackdrop.current)
         Spacer(Modifier.width(9.dp))
         Column(Modifier.weight(1f).clickable(onClick = onToggle).padding(vertical = 4.dp)) {
             AdminText(label, fontSize = 13.sp)
@@ -284,14 +267,21 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
         selected -> colors.accent
         else -> colors.textSecondary
     }
-    val modifier = Modifier
-        .liquidGlass(
-            LocalLiquidBackdrop.current,
-            LiquidGlassStyle(16.dp, 2.dp, 7.dp, 12.dp, if (selected) tint.copy(alpha = 0.24f) else Color(0x38101418), tint.copy(alpha = 0.18f)),
+    LiquidButton(
+        onClick = onClick ?: {},
+        backdrop = LocalLiquidBackdrop.current,
+        isInteractive = onClick != null,
+        tint = if (selected || destructive) tint else Color.Unspecified,
+        surfaceColor = if (selected || destructive) Color.Unspecified else Color.White.copy(alpha = 0.3f),
+    ) {
+        AdminText(
+            label,
+            color = if (selected || destructive) Color.White else tint,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
         )
-        .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-        .padding(horizontal = 10.dp, vertical = 6.dp)
-    Box(modifier) { AdminText(label, color = tint, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1) }
+    }
 }
 
 @Composable
@@ -368,23 +358,38 @@ fun AdminPageTitle(title: String, subtitle: String) {
 @Composable
 fun AdminTopBar(onRefresh: () -> Unit, onLock: () -> Unit, backend: Backend, onBackend: (Backend) -> Unit) {
     val colors = AdminTheme.colors
+    val sceneBackdrop = LocalLiquidBackdrop.current
+    val barBackdrop = rememberLayerBackdrop()
     Column(
         Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)
-            .liquidGlass(LocalLiquidBackdrop.current, LiquidGlassStyle(24.dp, 10.dp, 12.dp, 20.dp, Color(0x52101418))),
+            .drawBackdrop(
+                backdrop = sceneBackdrop,
+                shape = { RoundedRectangle(32.dp) },
+                effects = {
+                    vibrancy()
+                    blur(4.dp.toPx())
+                    lens(16.dp.toPx(), 32.dp.toPx())
+                },
+                highlight = { Highlight.Plain },
+                exportedBackdrop = barBackdrop,
+                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.5f)) },
+            ),
     ) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                AdminText("> админ сервера", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                AdminText("api.gsgit.org", color = colors.textMuted, fontSize = 10.sp)
+        CompositionLocalProvider(LocalLiquidBackdrop provides barBackdrop) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    AdminText("> админ сервера", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                    AdminText("api.gsgit.org", color = colors.textMuted, fontSize = 10.sp)
+                }
+                AdminTextAction("↻", onRefresh, enabled = backend == Backend.GsGit)
+                AdminTextAction("[ замок ]", onLock)
             }
-            AdminTextAction("↻", onRefresh, enabled = backend == Backend.GsGit)
-            AdminTextAction("[ замок ]", onLock)
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Backend.entries.forEach { item -> AdminChip(item.name, backend == item) { onBackend(item) } }
+            }
+            Spacer(Modifier.height(6.dp))
+            AdminHairline()
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Backend.entries.forEach { item -> AdminChip(item.name, backend == item) { onBackend(item) } }
-        }
-        Spacer(Modifier.height(6.dp))
-        AdminHairline()
     }
 }
 
@@ -395,7 +400,7 @@ fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Sect
     val colors = AdminTheme.colors
     val selectedIndex = items.indexOfFirst { it.section == selected }.coerceAtLeast(0)
     Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp)) {
-        KyantLiquidBottomTabs(
+        LiquidBottomTabs(
             selectedTabIndex = { selectedIndex },
             onTabSelected = { index -> items.getOrNull(index)?.let { onSelect(it.section) } },
             backdrop = LocalLiquidBackdrop.current,
@@ -405,7 +410,7 @@ fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Sect
             items.forEach { item ->
                 val active = item.section == selected
                 val tint = if (active) colors.accent else colors.textPrimary
-                KyantLiquidBottomTab(onClick = { onSelect(item.section) }) {
+                LiquidBottomTab(onClick = { onSelect(item.section) }) {
                     AdminText(item.glyph, color = tint, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                     AdminText(item.label, color = tint, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
                 }
