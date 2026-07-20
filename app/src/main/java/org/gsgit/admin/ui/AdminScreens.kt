@@ -414,8 +414,8 @@ private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         AdminCard {
             AdminSectionLabel("защита экрана")
-            AdminKeyValue("скриншоты", "запрещены")
-            AdminKeyValue("последние приложения", "содержимое скрыто")
+            AdminKeyValue("скриншоты", "разрешены")
+            AdminKeyValue("запись экрана", "разрешена")
             AdminCheckRow("Биометрическая блокировка", state.biometricEnabled, { viewModel.setBiometricEnabled(!state.biometricEnabled) }, "Используется системный отпечаток, лицо или код устройства")
         }
         AdminCard {
