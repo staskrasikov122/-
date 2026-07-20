@@ -53,10 +53,6 @@ data class GlassSettings(
     val tintChroma: Float = 0f,            // 0..0.6 — 0 = нейтрально-тёмный
     // Скрим обоев
     val wallpaperScrim: Float = 0f,        // 0..0.6 — тёмный слой над обоями
-    // Стекло контролов
-    val controlLensHeight: Float = 12f,    // dp, 0..48
-    val controlLensAmount: Float = 24f,    // dp, 0..96
-    val controlBlur: Float = 2f,           // dp, 0..16
     // Геометрия теней контролов
     val controlShadowRadius: Float = 10f,  // dp, 0..24
     val controlInnerRadius: Float = 6f,    // dp, 0..16
@@ -109,9 +105,6 @@ object GlassSettingsStore {
             tintHue = p.getFloat("tintHue", d.tintHue),
             tintChroma = p.getFloat("tintChroma", d.tintChroma),
             wallpaperScrim = p.getFloat("wallpaperScrim", d.wallpaperScrim),
-            controlLensHeight = p.getFloat("controlLensHeight", d.controlLensHeight),
-            controlLensAmount = p.getFloat("controlLensAmount", d.controlLensAmount),
-            controlBlur = p.getFloat("controlBlur", d.controlBlur),
             controlShadowRadius = p.getFloat("controlShadowRadius", d.controlShadowRadius),
             controlInnerRadius = p.getFloat("controlInnerRadius", d.controlInnerRadius),
             edgeBlurTop = p.getFloat("edgeBlurTop", d.edgeBlurTop),
@@ -159,9 +152,6 @@ object GlassSettingsStore {
             putFloat("tintHue", settings.tintHue)
             putFloat("tintChroma", settings.tintChroma)
             putFloat("wallpaperScrim", settings.wallpaperScrim)
-            putFloat("controlLensHeight", settings.controlLensHeight)
-            putFloat("controlLensAmount", settings.controlLensAmount)
-            putFloat("controlBlur", settings.controlBlur)
             putFloat("controlShadowRadius", settings.controlShadowRadius)
             putFloat("controlInnerRadius", settings.controlInnerRadius)
             putFloat("edgeBlurTop", settings.edgeBlurTop)

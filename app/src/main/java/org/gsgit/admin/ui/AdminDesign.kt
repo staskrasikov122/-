@@ -83,10 +83,6 @@ import kotlin.math.tanh
 //  * нижний бар — GlassBottomTabBar, портирован из GlassFiles: парящая
 //    капсула с усиленной линзой, индикатор резкий.
 
-// Полупрозрачные поверхности стеклянных контролов: на тёмных обоях цвет
-// должен пропускать фон, иначе стекло читается как сплошной пластик.
-private val NeutralGlassSurface = Color.White.copy(alpha = 0.12f)
-
 // Высота плавающего хрома: под него контент получает contentPadding,
 // чтобы списки проезжали под кромками и плавно размывались.
 private val AdminTopChromeHeight = 112.dp
@@ -275,13 +271,24 @@ private fun AdminGlassCapsule(
             .drawBackdrop(
                 backdrop = LocalLiquidBackdrop.current,
                 shape = { Capsule() },
+                // Тот же рецепт стекла, что у блоков (AdminCard): кнопки выглядят
+                // как мини-панели, все параметры из группы «Панели».
                 effects = {
                     val g = GlassSettingsStore.state.value
-                    vibrancy()
-                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
-                    lens(g.controlLensHeight.dp.toPx(), g.controlLensAmount.dp.toPx(), chromaticAberration = true)
+                    if (g.vibrancy) vibrancy()
+                    colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
+                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
+                    lens(
+                        g.refractionHeight.dp.toPx(),
+                        g.refractionAmount.dp.toPx(),
+                        depthEffect = g.depthEffect,
+                        chromaticAberration = g.chromaticAberration,
+                    )
                 },
-                highlight = { Highlight.Ambient },
+                highlight = {
+                    val g = GlassSettingsStore.state.value
+                    Highlight.Ambient.copy(width = g.highlightWidth.dp, blurRadius = g.highlightBlur.dp, alpha = g.highlightAlpha)
+                },
                 shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = g.controlShadowRadius.dp, color = Color.Black.copy(alpha = g.controlShadow)) },
                 innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = g.controlInnerRadius.dp, alpha = g.controlInnerShadow) },
                 layerBlock = if (enabled) {
@@ -309,7 +316,12 @@ private fun AdminGlassCapsule(
                 },
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
-                    drawRect(if (tint.isSpecified) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
+                    if (tint.isSpecified) {
+                        drawRect(tint.copy(alpha = g.tintAlpha))
+                    } else {
+                        val cardTint = Color.hsl(g.tintHue.coerceIn(0f, 360f), g.tintChroma.coerceIn(0f, 1f), 0.07f)
+                        drawRect(cardTint.copy(alpha = g.cardSurfaceAlpha.coerceIn(0f, 1f)))
+                    }
                     drawRect(Color.White.copy(alpha = g.controlStroke), style = Stroke(width = 0.8.dp.toPx()))
                 },
             )
@@ -406,16 +418,30 @@ fun AdminIconAction(
                 shape = { Capsule() },
                 effects = {
                     val g = GlassSettingsStore.state.value
-                    vibrancy()
-                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
-                    lens(g.controlLensHeight.dp.toPx() * 0.85f, g.controlLensAmount.dp.toPx() * 0.85f, chromaticAberration = true)
+                    if (g.vibrancy) vibrancy()
+                    colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
+                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
+                    lens(
+                        g.refractionHeight.dp.toPx() * 0.85f,
+                        g.refractionAmount.dp.toPx() * 0.85f,
+                        depthEffect = g.depthEffect,
+                        chromaticAberration = g.chromaticAberration,
+                    )
                 },
-                highlight = { Highlight.Ambient },
+                highlight = {
+                    val g = GlassSettingsStore.state.value
+                    Highlight.Ambient.copy(width = g.highlightWidth.dp, blurRadius = g.highlightBlur.dp, alpha = g.highlightAlpha)
+                },
                 shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = (g.controlShadowRadius * 0.8f).dp, color = Color.Black.copy(alpha = g.controlShadow * 0.85f)) },
                 innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = (g.controlInnerRadius * 0.7f).dp, alpha = g.controlInnerShadow * 0.85f) },
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
-                    drawRect(if (active) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
+                    if (active) {
+                        drawRect(tint.copy(alpha = g.tintAlpha))
+                    } else {
+                        val cardTint = Color.hsl(g.tintHue.coerceIn(0f, 360f), g.tintChroma.coerceIn(0f, 1f), 0.07f)
+                        drawRect(cardTint.copy(alpha = g.cardSurfaceAlpha.coerceIn(0f, 1f)))
+                    }
                     drawRect(Color.White.copy(alpha = g.controlStroke * 0.9f), style = Stroke(width = 0.8.dp.toPx()))
                 },
             )
@@ -512,16 +538,30 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                 shape = { Capsule() },
                 effects = {
                     val g = GlassSettingsStore.state.value
-                    vibrancy()
-                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
-                    lens(g.controlLensHeight.dp.toPx() * 0.66f, g.controlLensAmount.dp.toPx() * 0.66f)
+                    if (g.vibrancy) vibrancy()
+                    colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
+                    if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
+                    lens(
+                        g.refractionHeight.dp.toPx() * 0.66f,
+                        g.refractionAmount.dp.toPx() * 0.66f,
+                        depthEffect = g.depthEffect,
+                        chromaticAberration = g.chromaticAberration,
+                    )
                 },
-                highlight = { Highlight.Ambient },
+                highlight = {
+                    val g = GlassSettingsStore.state.value
+                    Highlight.Ambient.copy(width = g.highlightWidth.dp, blurRadius = g.highlightBlur.dp, alpha = g.highlightAlpha)
+                },
                 shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = (g.controlShadowRadius * 0.6f).dp, color = Color.Black.copy(alpha = g.controlShadow * 0.75f)) },
                 innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = (g.controlInnerRadius * 0.5f).dp, alpha = g.controlInnerShadow * 0.75f) },
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
-                    drawRect(if (tint.isSpecified) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
+                    if (tint.isSpecified) {
+                        drawRect(tint.copy(alpha = g.tintAlpha))
+                    } else {
+                        val cardTint = Color.hsl(g.tintHue.coerceIn(0f, 360f), g.tintChroma.coerceIn(0f, 1f), 0.07f)
+                        drawRect(cardTint.copy(alpha = g.cardSurfaceAlpha.coerceIn(0f, 1f)))
+                    }
                     drawRect(Color.White.copy(alpha = g.controlStroke * 0.8f), style = Stroke(width = 0.6.dp.toPx()))
                 },
             )
