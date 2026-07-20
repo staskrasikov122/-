@@ -21,9 +21,13 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.gsgit.admin.ui.liquid.LiquidScene
+import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 
 @Composable
@@ -190,16 +194,16 @@ private val adminNavigation = listOf(
 
 @Composable
 private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
-    Column(Modifier.fillMaxSize()) {
-        AdminTopBar(
-            onRefresh = viewModel::refreshAll,
-            onLock = viewModel::lock,
-            onOperations = { viewModel.selectSection(Section.Operations) },
-            operationsActive = state.section == Section.Operations,
-            backend = state.backend,
-            onBackend = viewModel::selectBackend,
-        )
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+    val sceneBackdrop = LocalLiquidBackdrop.current
+    val contentLayer = rememberLayerBackdrop()
+    // Хром (кромки и бары) размывает и преломляет не только обои, но и
+    // проезжающий под ним контент: сцена + слой контента.
+    val chromeBackdrop = rememberCombinedBackdrop(sceneBackdrop, contentLayer)
+    Box(Modifier.fillMaxSize()) {
+        // Контент во весь экран: списки проезжают под шапкой и баром
+        // (adminScreenPadding даёт им вставки). Слой контента — источник
+        // для кромочного блюра; его консюмеры ниже — сиблинги, не вложены.
+        Box(Modifier.fillMaxSize().layerBackdrop(contentLayer)) {
             if (state.backend == Backend.GlassFiles) {
                 GlassFilesPlaceholderV3()
             } else {
@@ -212,7 +216,23 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
                 }
             }
         }
-        if (state.backend == Backend.GsGit) AdminBottomBar(adminNavigation, state.section, viewModel::selectSection)
+        CompositionLocalProvider(LocalLiquidBackdrop provides chromeBackdrop) {
+            AdminEdgeBlur(topEdge = true, Modifier.align(Alignment.TopCenter))
+            if (state.backend == Backend.GsGit) {
+                AdminEdgeBlur(topEdge = false, Modifier.align(Alignment.BottomCenter))
+            }
+            AdminTopBar(
+                onRefresh = viewModel::refreshAll,
+                onLock = viewModel::lock,
+                onOperations = { viewModel.selectSection(Section.Operations) },
+                operationsActive = state.section == Section.Operations,
+                backend = state.backend,
+                onBackend = viewModel::selectBackend,
+            )
+            if (state.backend == Backend.GsGit) {
+                AdminBottomBar(adminNavigation, state.section, viewModel::selectSection, Modifier.align(Alignment.BottomCenter))
+            }
+        }
     }
 }
 

@@ -31,7 +31,7 @@ fun DashboardV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var maintenanceMessage by rememberSaveable { mutableStateOf("") }
     val maintenanceOn = stats.maintenance.isNotBlank() && !stats.maintenance.equals("off", true)
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AdminPageTitle("обзор", "здоровье сервера и реальные метрики") }
         item {
             when (val health = state.health) {
@@ -126,7 +126,7 @@ fun AppConfigV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var rollbackTarget by rememberSaveable { mutableStateOf<Int?>(null) }
     val changes = remember(serverConfig, config) { configChanges(serverConfig, config) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminScreenPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AdminPageTitle("конфигурация", "проверка, предпросмотр и безопасный откат")
         AdminCard {
             AdminSectionLabel("параметры клиентов")
@@ -197,7 +197,7 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var detailsOpen by rememberSaveable { mutableStateOf(false) }
     val recipients = (state.stats as? LoadState.Ready)?.value?.devices
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { AdminPageTitle("пуши", "рассылка, история и повтор ошибок") }
         item { AdminCard {
             AdminSectionLabel("новая рассылка")
@@ -259,7 +259,7 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var expanded by remember { mutableStateOf(setOf<String>()) }
     var deleteTarget by remember { mutableStateOf<AdminDevice?>(null) }
     var testTarget by remember { mutableStateOf<AdminDevice?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminPageTitle("устройства", "диагностика и адресные действия") }
         item { AdminCard {
             AdminTextField(query, { query = it }, label = "Фильтр по логину", placeholder = "часть логина")
@@ -328,7 +328,7 @@ private enum class OperationsTab(val label: String) { Maintenance("техраб�
 @Composable
 fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var tab by rememberSaveable { mutableStateOf(OperationsTab.Maintenance) }
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(top = adminTopChromeInset())) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AdminPageTitle("операции", "серверное управление и защита админки")
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -348,7 +348,7 @@ fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var starts by rememberSaveable { mutableStateOf("") }; var ends by rememberSaveable { mutableStateOf("") }; var message by rememberSaveable { mutableStateOf("") }; var confirm by rememberSaveable { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         when (val maintenance = state.maintenance) {
             is LoadState.Ready -> AdminCard {
                 AdminSectionLabel("текущее состояние"); AdminKeyValue("сейчас", maintenance.value.maintenanceNow.ifBlank { "выключено" })
@@ -376,7 +376,7 @@ private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var version by rememberSaveable { mutableStateOf("") }; var changelog by rememberSaveable { mutableStateOf("") }; var url by rememberSaveable { mutableStateOf("") }; var sha by rememberSaveable { mutableStateOf("") }; var mandatory by rememberSaveable { mutableStateOf(false) }; var rollout by rememberSaveable { mutableStateOf("100") }; var publish by rememberSaveable { mutableStateOf<String?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminCard {
             AdminSectionLabel("добавить или обновить релиз")
             Spacer(Modifier.height(10.dp))
@@ -405,7 +405,7 @@ private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun AuditPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     when (val audit = state.audit) {
-        is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             item { AdminPillButton("обновить", viewModel::loadAudit) }
             if (audit.value.items.isEmpty()) item { AdminCard { AdminText("журнал пуст", color = AdminTheme.colors.textMuted) } }
             items(audit.value.items, key = { it.id }) { record -> AdminCard {
@@ -424,7 +424,7 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("" to "все", "push" to "пуши", "github" to "GitHub", "database" to "база").forEach { (value,label) -> AdminChip(label, service == value) { service = value; viewModel.loadErrors(value) } } }
         when (val errors = state.errors) {
-            is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (errors.value.isEmpty()) item { AdminCard { AdminText("серверных ошибок нет", color = AdminTheme.colors.accent) } }
                 items(errors.value, key = { it.id }) { error -> AdminCard { Row { AdminText(error.code, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminText("×${error.count}") }; AdminText(error.message); AdminKeyValue("сервис", error.service); AdminKeyValue("последняя", displayDate(error.lastAt)) } }
             }
@@ -437,7 +437,7 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var logoutConfirm by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         AdminCard {
             AdminSectionLabel("защита экрана")
             AdminKeyValue("скриншоты", "разрешены")

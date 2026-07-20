@@ -31,11 +31,14 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.unit.Dp
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.colorControls
 import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.runtimeShaderEffect
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.shapes.Capsule
@@ -61,6 +64,84 @@ import org.gsgit.admin.ui.theme.AdminTheme
 // должен пропускать фон, иначе стекло читается как сплошной пластик.
 private val NeutralGlassSurface = Color.White.copy(alpha = 0.12f)
 private const val TintedGlassAlpha = 0.6f
+
+// Высота плавающего хрома: под него контент получает contentPadding,
+// чтобы списки проезжали под кромками и плавно размывались.
+private val AdminTopChromeHeight = 112.dp
+private val AdminBottomChromeClearance = 98.dp
+
+/** Вставки для полноэкранных списков: контент проходит под шапкой и баром. */
+@Composable
+fun adminScreenPadding(): PaddingValues {
+    val system = WindowInsets.systemBars.asPaddingValues()
+    return PaddingValues(
+        start = 16.dp,
+        end = 16.dp,
+        top = system.calculateTopPadding() + AdminTopChromeHeight,
+        bottom = system.calculateBottomPadding() + AdminBottomChromeClearance,
+    )
+}
+
+/** Вставки для панелей с собственной шапкой (операции): только нижняя кромка. */
+@Composable
+fun adminPanelPadding(): PaddingValues {
+    val system = WindowInsets.systemBars.asPaddingValues()
+    return PaddingValues(
+        start = 16.dp,
+        end = 16.dp,
+        top = 8.dp,
+        bottom = system.calculateBottomPadding() + AdminBottomChromeClearance,
+    )
+}
+
+/** Отступ фиксированного контента от верхней кромки (под плавающей шапкой). */
+@Composable
+fun adminTopChromeInset(): Dp =
+    WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + AdminTopChromeHeight
+
+// Прогрессивный блюр кромки: у края размытие максимальное, к центру экрана
+// alpha-маска сводит его в ноль (рецепт ProgressiveBlurContent из каталога
+// Kyant). Никаких заливок — только размытие того, что проезжает под кромкой.
+private const val EdgeBlurMaskShader = """
+uniform shader content;
+
+uniform float2 size;
+uniform float topEdge;
+
+half4 main(float2 coord) {
+    float a = topEdge > 0.5
+        ? smoothstep(size.y, size.y * 0.35, coord.y)
+        : smoothstep(0.0, size.y * 0.65, coord.y);
+    return content.eval(coord) * a;
+}"""
+
+@Composable
+fun AdminEdgeBlur(topEdge: Boolean, modifier: Modifier = Modifier) {
+    val backdrop = LocalLiquidBackdrop.current
+    val system = WindowInsets.systemBars.asPaddingValues()
+    val stripHeight =
+        if (topEdge) system.calculateTopPadding() + 64.dp
+        else system.calculateBottomPadding() + 56.dp
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(stripHeight)
+            .drawBackdrop(
+                backdrop = backdrop,
+                shape = { RectangleShape },
+                effects = {
+                    blur(10.dp.toPx())
+                    runtimeShaderEffect("AlphaMask", EdgeBlurMaskShader, "content") {
+                        setFloatUniform("size", size.width, size.height)
+                        setFloatUniform("topEdge", if (topEdge) 1f else 0f)
+                    }
+                },
+                // "Plain": без блика и теней — только размытие кромки.
+                highlight = null,
+                shadow = null,
+            ),
+    )
+}
 
 @Composable
 fun AdminText(
@@ -428,7 +509,7 @@ fun AdminTopBar(
 data class AdminNavItem(val section: Section, val label: String, val icon: ImageVector)
 
 @Composable
-fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Section) -> Unit) {
+fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Section) -> Unit, modifier: Modifier = Modifier) {
     val rawIndex = items.indexOfFirst { it.section == selected }
     // Когда открыт раздел вне бара (операции), индикатор остаётся на последней вкладке.
     var lastIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -439,7 +520,7 @@ fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Sect
         selectedTab = if (rawIndex >= 0) rawIndex else lastIndex,
         onTabSelected = { index -> items.getOrNull(index)?.let { onSelect(it.section) } },
         tabs = tabs,
-        modifier = Modifier.navigationBarsPadding(),
+        modifier = modifier.navigationBarsPadding(),
     )
 }
 
