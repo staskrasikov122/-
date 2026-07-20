@@ -475,45 +475,54 @@ private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 
 @Composable
 private fun GlassPanelV3() {
+    // Аккордеон: одна открытая группа за раз — короче экран и меньше
+    // одновременно живого стекла (свёрнутые слайдеры не в композиции).
+    var open by rememberSaveable { mutableStateOf("Обои") }
+    fun toggle(name: String) { open = if (open == name) "" else name }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        AdminCard {
-            AdminSectionLabel("обои")
-            Spacer(Modifier.height(10.dp))
+        AdminExpandableSection("Обои", open == "Обои", { toggle("Обои") }) {
+            Spacer(Modifier.height(4.dp))
             WallpaperPickerRow()
         }
-        AdminCard {
-            AdminSectionLabel("панели")
-            Spacer(Modifier.height(6.dp))
+        AdminExpandableSection("Панели", open == "Панели", { toggle("Панели") }) {
             GlassSlider("радиус углов", "%.0f dp", 8f..48f, { GlassSettingsStore.state.value.cardCornerRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardCornerRadius = it)) }
             GlassSlider("размытие", "%.0f dp", 0f..32f, { GlassSettingsStore.state.value.cardBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardBlur = it)) }
             GlassSlider("плотность заливки", "%.2f", 0f..0.8f, { GlassSettingsStore.state.value.cardSurfaceAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardSurfaceAlpha = it)) }
             GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.refractionHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionHeight = it)) }
             GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.refractionAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionAmount = it)) }
             GlassSlider("яркость", "%.2f", -0.5f..0.5f, { GlassSettingsStore.state.value.brightness }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(brightness = it)) }
+            GlassSlider("контраст", "%.2f", 0.5f..1.5f, { GlassSettingsStore.state.value.contrast }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(contrast = it)) }
             GlassSlider("насыщенность", "%.2f", 0f..2f, { GlassSettingsStore.state.value.saturation }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(saturation = it)) }
+            GlassSlider("блик: ширина", "%.1f dp", 0f..6f, { GlassSettingsStore.state.value.highlightWidth }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(highlightWidth = it)) }
+            GlassSlider("блик: размытие", "%.1f dp", 0f..12f, { GlassSettingsStore.state.value.highlightBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(highlightBlur = it)) }
+            GlassSlider("блик: яркость", "%.2f", 0f..1f, { GlassSettingsStore.state.value.highlightAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(highlightAlpha = it)) }
+            GlassSlider("оттенок стекла", "%.0f°", 0f..360f, { GlassSettingsStore.state.value.tintHue }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintHue = it)) }
+            GlassSlider("цветность стекла", "%.2f", 0f..0.6f, { GlassSettingsStore.state.value.tintChroma }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintChroma = it)) }
             GlassToggleRow("Глубина линзы", { it.depthEffect }) { g, v -> g.copy(depthEffect = v) }
             GlassToggleRow("Хроматическая аберрация", { it.chromaticAberration }) { g, v -> g.copy(chromaticAberration = v) }
             GlassToggleRow("Вибранс", { it.vibrancy }) { g, v -> g.copy(vibrancy = v) }
         }
-        AdminCard {
-            AdminSectionLabel("кнопки и чипы")
-            Spacer(Modifier.height(6.dp))
+        AdminExpandableSection("Контролы", open == "Контролы", { toggle("Контролы") }) {
             GlassSlider("плотность цвета", "%.2f", 0.2f..1f, { GlassSettingsStore.state.value.tintAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintAlpha = it)) }
+            GlassSlider("линза: высота", "%.0f dp", 0f..48f, { GlassSettingsStore.state.value.controlLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlLensHeight = it)) }
+            GlassSlider("линза: сила", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.controlLensAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlLensAmount = it)) }
+            GlassSlider("размытие", "%.0f dp", 0f..16f, { GlassSettingsStore.state.value.controlBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlBlur = it)) }
             GlassSlider("внешняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadow = it)) }
+            GlassSlider("тень: радиус", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.controlShadowRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadowRadius = it)) }
             GlassSlider("внутренняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlInnerShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerShadow = it)) }
+            GlassSlider("вн. тень: радиус", "%.0f dp", 0f..16f, { GlassSettingsStore.state.value.controlInnerRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerRadius = it)) }
             GlassSlider("окантовка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.controlStroke }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlStroke = it)) }
         }
-        AdminCard {
-            AdminSectionLabel("нижний бар")
-            Spacer(Modifier.height(6.dp))
+        AdminExpandableSection("Нижний бар", open == "Нижний бар", { toggle("Нижний бар") }) {
             GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.barLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensHeight = it)) }
             GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.barLensAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensAmount = it)) }
             GlassSlider("тонировка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.barSurfaceAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barSurfaceAlpha = it)) }
         }
-        AdminCard {
-            AdminSectionLabel("кромки экрана")
-            Spacer(Modifier.height(6.dp))
-            GlassSlider("размытие кромок", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.edgeBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeBlur = it)) }
+        AdminExpandableSection("Кромки и фон", open == "Кромки и фон", { toggle("Кромки и фон") }) {
+            GlassSlider("затемнение обоев", "%.2f", 0f..0.6f, { GlassSettingsStore.state.value.wallpaperScrim }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaperScrim = it)) }
+            GlassSlider("блюр кромки сверху", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.edgeBlurTop }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeBlurTop = it)) }
+            GlassSlider("блюр кромки снизу", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.edgeBlurBottom }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeBlurBottom = it)) }
+            GlassSlider("высота фейда", "%.0f dp", 16f..64f, { GlassSettingsStore.state.value.edgeFadeHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeFadeHeight = it)) }
         }
         AdminPillButton("сбросить настройки стекла", { GlassSettingsStore.reset() }, Modifier.fillMaxWidth(), accent = false)
     }

@@ -1,5 +1,13 @@
 package org.gsgit.admin.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,9 +27,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.VisualTransformation
@@ -119,11 +129,11 @@ uniform shader content;
 
 uniform float2 size;
 uniform float topEdge;
+uniform float fade;
 
 half4 main(float2 coord) {
-    float a = topEdge > 0.5
-        ? smoothstep(size.y, size.y * 0.35, coord.y)
-        : smoothstep(0.0, size.y * 0.65, coord.y);
+    float d = topEdge > 0.5 ? coord.y : size.y - coord.y;
+    float a = 1.0 - smoothstep(fade * 0.35, fade, d);
     return content.eval(coord) * a;
 }"""
 
@@ -131,9 +141,9 @@ half4 main(float2 coord) {
 fun AdminEdgeBlur(topEdge: Boolean, modifier: Modifier = Modifier) {
     val backdrop = LocalLiquidBackdrop.current
     val system = WindowInsets.systemBars.asPaddingValues()
-    val stripHeight =
-        if (topEdge) system.calculateTopPadding() + 64.dp
-        else system.calculateBottomPadding() + 56.dp
+    val systemInset = if (topEdge) system.calculateTopPadding() else system.calculateBottomPadding()
+    val systemInsetPx = with(LocalDensity.current) { systemInset.toPx() }
+    val stripHeight = systemInset + 64.dp
     Box(
         modifier
             .fillMaxWidth()
@@ -142,10 +152,13 @@ fun AdminEdgeBlur(topEdge: Boolean, modifier: Modifier = Modifier) {
                 backdrop = backdrop,
                 shape = { RectangleShape },
                 effects = {
-                    blur(GlassSettingsStore.state.value.edgeBlur.dp.toPx())
+                    val g = GlassSettingsStore.state.value
+                    blur((if (topEdge) g.edgeBlurTop else g.edgeBlurBottom).dp.toPx())
+                    val fadePx = (systemInsetPx + g.edgeFadeHeight.dp.toPx()).coerceAtMost(size.height)
                     runtimeShaderEffect("AlphaMask", EdgeBlurMaskShader, "content") {
                         setFloatUniform("size", size.width, size.height)
                         setFloatUniform("topEdge", if (topEdge) 1f else 0f)
+                        setFloatUniform("fade", fadePx)
                     }
                 },
                 // "Plain": без блика и теней — только размытие кромки.
@@ -208,7 +221,7 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
                 effects = {
                     val g = GlassSettingsStore.state.value
                     if (g.vibrancy) vibrancy()
-                    colorControls(brightness = g.brightness, saturation = g.saturation)
+                    colorControls(brightness = g.brightness, contrast = g.contrast, saturation = g.saturation)
                     if (g.cardBlur > 0f) blur(g.cardBlur.dp.toPx())
                     lens(
                         g.refractionHeight.dp.toPx(),
@@ -217,12 +230,21 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
                         chromaticAberration = g.chromaticAberration,
                     )
                 },
-                highlight = { Highlight.Plain },
+                highlight = {
+                    val g = GlassSettingsStore.state.value
+                    Highlight.Ambient.copy(
+                        width = g.highlightWidth.dp,
+                        blurRadius = g.highlightBlur.dp,
+                        alpha = g.highlightAlpha,
+                    )
+                },
                 exportedBackdrop = contentBackdrop,
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
+                    // Цвет тонировки из hue/chroma вместо хардкода 0xFF121212.
+                    val tint = Color.hsl(g.tintHue.coerceIn(0f, 360f), g.tintChroma.coerceIn(0f, 1f), 0.07f)
                     val alpha = (g.cardSurfaceAlpha + if (elevated) 0.15f else 0f).coerceIn(0f, 1f)
-                    drawRect(Color(0xFF121212).copy(alpha = alpha))
+                    drawRect(tint.copy(alpha = alpha))
                 },
             )
             .padding(horizontal = if (elevated) 24.dp else 18.dp, vertical = if (elevated) 22.dp else 16.dp),
@@ -254,13 +276,14 @@ private fun AdminGlassCapsule(
                 backdrop = LocalLiquidBackdrop.current,
                 shape = { Capsule() },
                 effects = {
+                    val g = GlassSettingsStore.state.value
                     vibrancy()
-                    blur(2.dp.toPx())
-                    lens(12.dp.toPx(), 24.dp.toPx(), chromaticAberration = true)
+                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
+                    lens(g.controlLensHeight.dp.toPx(), g.controlLensAmount.dp.toPx(), chromaticAberration = true)
                 },
                 highlight = { Highlight.Ambient },
-                shadow = { Shadow(radius = 10.dp, color = Color.Black.copy(alpha = GlassSettingsStore.state.value.controlShadow)) },
-                innerShadow = { InnerShadow(radius = 6.dp, alpha = GlassSettingsStore.state.value.controlInnerShadow) },
+                shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = g.controlShadowRadius.dp, color = Color.Black.copy(alpha = g.controlShadow)) },
+                innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = g.controlInnerRadius.dp, alpha = g.controlInnerShadow) },
                 layerBlock = if (enabled) {
                     {
                         val width = size.width
@@ -382,13 +405,14 @@ fun AdminIconAction(
                 backdrop = backdrop,
                 shape = { Capsule() },
                 effects = {
+                    val g = GlassSettingsStore.state.value
                     vibrancy()
-                    blur(2.dp.toPx())
-                    lens(10.dp.toPx(), 20.dp.toPx(), chromaticAberration = true)
+                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
+                    lens(g.controlLensHeight.dp.toPx() * 0.85f, g.controlLensAmount.dp.toPx() * 0.85f, chromaticAberration = true)
                 },
                 highlight = { Highlight.Ambient },
-                shadow = { Shadow(radius = 8.dp, color = Color.Black.copy(alpha = GlassSettingsStore.state.value.controlShadow * 0.85f)) },
-                innerShadow = { InnerShadow(radius = 4.dp, alpha = GlassSettingsStore.state.value.controlInnerShadow * 0.85f) },
+                shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = (g.controlShadowRadius * 0.8f).dp, color = Color.Black.copy(alpha = g.controlShadow * 0.85f)) },
+                innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = (g.controlInnerRadius * 0.7f).dp, alpha = g.controlInnerShadow * 0.85f) },
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
                     drawRect(if (active) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
@@ -487,13 +511,14 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                 backdrop = backdrop,
                 shape = { Capsule() },
                 effects = {
+                    val g = GlassSettingsStore.state.value
                     vibrancy()
-                    blur(2.dp.toPx())
-                    lens(8.dp.toPx(), 16.dp.toPx())
+                    if (g.controlBlur > 0f) blur(g.controlBlur.dp.toPx())
+                    lens(g.controlLensHeight.dp.toPx() * 0.66f, g.controlLensAmount.dp.toPx() * 0.66f)
                 },
                 highlight = { Highlight.Ambient },
-                shadow = { Shadow(radius = 6.dp, color = Color.Black.copy(alpha = GlassSettingsStore.state.value.controlShadow * 0.75f)) },
-                innerShadow = { InnerShadow(radius = 3.dp, alpha = GlassSettingsStore.state.value.controlInnerShadow * 0.75f) },
+                shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = (g.controlShadowRadius * 0.6f).dp, color = Color.Black.copy(alpha = g.controlShadow * 0.75f)) },
+                innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = (g.controlInnerRadius * 0.5f).dp, alpha = g.controlInnerShadow * 0.75f) },
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
                     drawRect(if (tint.isSpecified) tint.copy(alpha = g.tintAlpha) else NeutralGlassSurface)
@@ -629,6 +654,43 @@ fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Sect
         tabs = tabs,
         modifier = modifier.navigationBarsPadding(),
     )
+}
+
+/** Сворачиваемая секция настроек: заголовок с шевроном, мягкие пружины. */
+@Composable
+fun AdminExpandableSection(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    AdminCard {
+        Row(
+            Modifier.fillMaxWidth().liquidClickable(pressedScale = LiquidMotion.PressCard, onClick = onToggle),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AdminSectionLabel(title, Modifier.weight(1f))
+            // Шеврон крутится мягкой пружиной — в тон остальному стеклу.
+            val rotation by animateFloatAsState(
+                if (expanded) 180f else 0f,
+                spring(dampingRatio = 0.9f, stiffness = 300f),
+                label = "chevron",
+            )
+            AdminIcon(
+                AdminIcons.ExpandMore,
+                null,
+                Modifier.size(20.dp).graphicsLayer { rotationZ = rotation },
+                tint = AdminTheme.colors.textSecondary,
+            )
+        }
+        AnimatedVisibility(
+            expanded,
+            enter = expandVertically(spring(dampingRatio = 0.9f, stiffness = 300f)) + fadeIn(tween(150)),
+            exit = shrinkVertically(spring(dampingRatio = 0.9f, stiffness = 300f)) + fadeOut(tween(120)),
+        ) {
+            Column(Modifier.padding(top = 8.dp)) { content() }
+        }
+    }
 }
 
 @Composable

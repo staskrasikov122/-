@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -45,6 +46,19 @@ import com.kyant.shapes.Capsule
 import kotlinx.coroutines.flow.collectLatest
 import org.gsgit.admin.ui.kyant.utils.DampedDragAnimation
 
+/**
+ * ИСПРАВЛЕНО: слайдер дёргался/тормозил, потому что предыдущая версия выкинула
+ * три механизма эталона (LMG):
+ *   1) НЕТ флага isDragging — внешнее value() круговоротом возвращалось в
+ *      updateValue во время драга, и пружина гналась за round-trip-значением
+ *      вместо пальца → джиттер («дёрганый/резкий»).
+ *   2) НЕТ троттлинга onValueChange — колбэк дёргался на КАЖДЫЙ пиксель драга,
+ *      GlassSettingsStore.state менялся десятки раз/сек → всё стекло на экране
+ *      рекомпозилось на каждый кадр → лаг («тормознутый»).
+ *   3) НЕТ rememberUpdatedState(value) — долгоживущий LaunchedEffect держал
+ *      старую лямбду.
+ * Всё это восстановлено. Пружина и стекло — те же (1:1 c эталоном).
+ */
 @Composable
 fun LiquidSlider(
     value: () -> Float,
@@ -73,6 +87,9 @@ fun LiquidSlider(
         val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
         val animationScope = rememberCoroutineScope()
         var didDrag by remember { mutableStateOf(false) }
+        // (1) флаг драга — как в эталоне
+        var isDragging by remember { mutableStateOf(false) }
+
         val dampedDragAnimation = remember(animationScope) {
             DampedDragAnimation(
                 animationScope = animationScope,
@@ -81,31 +98,52 @@ fun LiquidSlider(
                 visibilityThreshold = visibilityThreshold,
                 initialScale = 1f,
                 pressedScale = 1.5f,
-                onDragStarted = {},
+                onDragStarted = {
+                    isDragging = true
+                },
                 onDragStopped = {
                     if (didDrag) {
-                        onValueChange(targetValue)
+                        onValueChange(targetValue)   // финальный точный коммит
                     }
+                    isDragging = false
+                    didDrag = false
                 },
                 onDrag = { _, dragAmount ->
                     if (!didDrag) {
                         didDrag = dragAmount.x != 0f
                     }
                     val delta = (valueRange.endInclusive - valueRange.start) * (dragAmount.x / trackWidth)
-                    onValueChange(
+                    val newValue =
                         if (isLtr) (targetValue + delta).coerceIn(valueRange)
                         else (targetValue - delta).coerceIn(valueRange)
-                    )
+                    // ВНУТРЕННЯЯ пружина ведёт палец плавно; наружу — throttled ниже
+                    updateValue(newValue)
                 }
             )
         }
+
+        // (3) rememberUpdatedState — свежая лямбда каждый кадр.
+        // (1) внешние изменения применяем ТОЛЬКО когда НЕ drag — иначе круговорот.
+        val latestValue = rememberUpdatedState(value)
         LaunchedEffect(dampedDragAnimation) {
-            snapshotFlow { value() }
-                .collectLatest { value ->
-                    if (dampedDragAnimation.targetValue != value) {
-                        dampedDragAnimation.updateValue(value)
+            snapshotFlow { latestValue.value() }
+                .collectLatest { v ->
+                    if (!isDragging && dampedDragAnimation.targetValue != v) {
+                        dampedDragAnimation.updateValue(v)
                     }
                 }
+        }
+
+        // (2) throttle: наружу пушим не чаще ~80ms и ТОЛЬКО во время drag.
+        // Это снимает рекомпоз-шторм GlassSettingsStore (был на каждый пиксель).
+        LaunchedEffect(isDragging) {
+            if (!isDragging) return@LaunchedEffect
+            while (true) {
+                kotlinx.coroutines.delay(80L)
+                if (didDrag) {
+                    onValueChange(dampedDragAnimation.targetValue)
+                }
+            }
         }
 
         Box(Modifier.layerBackdrop(trackBackdrop)) {
@@ -135,7 +173,11 @@ fun LiquidSlider(
                     .height(6f.dp)
                     .layout { measurable, constraints ->
                         val placeable = measurable.measure(constraints)
-                        val width = (constraints.maxWidth * dampedDragAnimation.progress).fastRoundToInt()
+                        // (4) КЛАМП — пружина 0.75 может слегка перелетать за края,
+                        // без clamp ширина уходила в минус/за экран → визуальный скачок.
+                        val width = (constraints.maxWidth * dampedDragAnimation.progress)
+                            .fastRoundToInt()
+                            .coerceIn(0, constraints.maxWidth)
                         layout(width, placeable.height) {
                             placeable.place(0, 0)
                         }

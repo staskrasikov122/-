@@ -41,7 +41,29 @@ data class GlassSettings(
     val barLensAmount: Float = 48f,        // dp, 0..96
     val barSurfaceAlpha: Float = 0.13f,    // 0..0.5 — тёмный тинт бара
     // Кромки экрана
-    val edgeBlur: Float = 10f,             // dp, 0..24
+    val edgeBlur: Float = 10f,             // dp, 0..24 (legacy, см. edgeBlurTop/Bottom)
+    // Блик (главный акцент «жидкого стекла»)
+    val highlightWidth: Float = 1.5f,      // dp, 0..6   — толщина световой кромки
+    val highlightBlur: Float = 2f,         // dp, 0..12  — размытие блика
+    val highlightAlpha: Float = 1f,        // 0..1       — яркость блика
+    // Контраст панелей
+    val contrast: Float = 1f,              // 0.5..1.5
+    // Цвет тонировки панелей
+    val tintHue: Float = 0f,               // 0..360
+    val tintChroma: Float = 0f,            // 0..0.6 — 0 = нейтрально-тёмный
+    // Скрим обоев
+    val wallpaperScrim: Float = 0f,        // 0..0.6 — тёмный слой над обоями
+    // Стекло контролов
+    val controlLensHeight: Float = 12f,    // dp, 0..48
+    val controlLensAmount: Float = 24f,    // dp, 0..96
+    val controlBlur: Float = 2f,           // dp, 0..16
+    // Геометрия теней контролов
+    val controlShadowRadius: Float = 10f,  // dp, 0..24
+    val controlInnerRadius: Float = 6f,    // dp, 0..16
+    // Кромки раздельно
+    val edgeBlurTop: Float = 10f,          // dp, 0..24
+    val edgeBlurBottom: Float = 10f,       // dp, 0..24
+    val edgeFadeHeight: Float = 32f,       // dp, 16..64 — высота градиентной полосы
 )
 
 /**
@@ -80,6 +102,21 @@ object GlassSettingsStore {
             barLensAmount = p.getFloat("barLensAmount", d.barLensAmount),
             barSurfaceAlpha = p.getFloat("barSurfaceAlpha", d.barSurfaceAlpha),
             edgeBlur = p.getFloat("edgeBlur", d.edgeBlur),
+            highlightWidth = p.getFloat("highlightWidth", d.highlightWidth),
+            highlightBlur = p.getFloat("highlightBlur", d.highlightBlur),
+            highlightAlpha = p.getFloat("highlightAlpha", d.highlightAlpha),
+            contrast = p.getFloat("contrast", d.contrast),
+            tintHue = p.getFloat("tintHue", d.tintHue),
+            tintChroma = p.getFloat("tintChroma", d.tintChroma),
+            wallpaperScrim = p.getFloat("wallpaperScrim", d.wallpaperScrim),
+            controlLensHeight = p.getFloat("controlLensHeight", d.controlLensHeight),
+            controlLensAmount = p.getFloat("controlLensAmount", d.controlLensAmount),
+            controlBlur = p.getFloat("controlBlur", d.controlBlur),
+            controlShadowRadius = p.getFloat("controlShadowRadius", d.controlShadowRadius),
+            controlInnerRadius = p.getFloat("controlInnerRadius", d.controlInnerRadius),
+            edgeBlurTop = p.getFloat("edgeBlurTop", d.edgeBlurTop),
+            edgeBlurBottom = p.getFloat("edgeBlurBottom", d.edgeBlurBottom),
+            edgeFadeHeight = p.getFloat("edgeFadeHeight", d.edgeFadeHeight),
         )
     }
 
@@ -115,6 +152,21 @@ object GlassSettingsStore {
             putFloat("barLensAmount", settings.barLensAmount)
             putFloat("barSurfaceAlpha", settings.barSurfaceAlpha)
             putFloat("edgeBlur", settings.edgeBlur)
+            putFloat("highlightWidth", settings.highlightWidth)
+            putFloat("highlightBlur", settings.highlightBlur)
+            putFloat("highlightAlpha", settings.highlightAlpha)
+            putFloat("contrast", settings.contrast)
+            putFloat("tintHue", settings.tintHue)
+            putFloat("tintChroma", settings.tintChroma)
+            putFloat("wallpaperScrim", settings.wallpaperScrim)
+            putFloat("controlLensHeight", settings.controlLensHeight)
+            putFloat("controlLensAmount", settings.controlLensAmount)
+            putFloat("controlBlur", settings.controlBlur)
+            putFloat("controlShadowRadius", settings.controlShadowRadius)
+            putFloat("controlInnerRadius", settings.controlInnerRadius)
+            putFloat("edgeBlurTop", settings.edgeBlurTop)
+            putFloat("edgeBlurBottom", settings.edgeBlurBottom)
+            putFloat("edgeFadeHeight", settings.edgeFadeHeight)
             apply()
         }
     }

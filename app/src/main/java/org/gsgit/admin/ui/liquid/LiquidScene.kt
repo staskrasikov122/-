@@ -17,10 +17,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import org.gsgit.admin.R
+import org.gsgit.admin.data.GlassSettingsStore
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -88,13 +90,22 @@ fun LiquidScene(
 
 @Composable
 private fun LiquidSceneBackground(wallpaperRes: Int, modifier: Modifier = Modifier) {
-    // Обои без скрима — как в каталоге Kyant: стеклу нужен живой фон.
-    Image(
-        painter = painterResource(wallpaperRes),
-        contentDescription = null,
-        modifier = modifier,
-        contentScale = ContentScale.Crop,
-    )
+    Box(modifier) {
+        Image(
+            painter = painterResource(wallpaperRes),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        // Настраиваемый скрим обоев (читается в draw-фазе — без рекомпозиций).
+        // Внутри слоя-источника: и контент, и стекло видят затемнённые обои.
+        Box(
+            Modifier.fillMaxSize().drawBehind {
+                val scrim = GlassSettingsStore.state.value.wallpaperScrim
+                if (scrim > 0f) drawRect(Color.Black, alpha = scrim.coerceIn(0f, 1f))
+            },
+        )
+    }
 }
 
 @Composable
