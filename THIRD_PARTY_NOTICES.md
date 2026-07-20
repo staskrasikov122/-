@@ -15,7 +15,25 @@
 `LiquidBottomTabs`, `LiquidBottomTab`, `InteractiveHighlight`,
 `DampedDragAnimation`, `DragGestureInspector` и Android-обёртка `awaitFrame`.
 Изменены только namespace/import для обычного Android-модуля.
-В качестве фонового изображения интерфейса также используется
-`wallpaper_light.webp` из того же зафиксированного снимка проекта.
+`LiquidBottomTabsBare` — адаптация `LiquidBottomTabs` без стеклянной подложки,
+на основе того же снимка.
 
 Copyright Kyant0. Licensed under the Apache License, Version 2.0.
+
+## Inter
+
+Шрифт интерфейса — Inter:
+
+- автор: Rasmus Andersson;
+- репозиторий: https://github.com/rsms/inter;
+- статические начертания (Regular/Medium/SemiBold/Bold) инстанцированы из
+  вариативного шрифта, распространяемого через Google Fonts;
+- лицензия: SIL Open Font License 1.1.
+
+## Material Icons
+
+Векторные иконки навигации и панелей (`AdminIcons`) — path-данные из
+Material Icons (Round):
+
+- проект: https://github.com/google/material-design-icons;
+- лицензия: Apache License 2.0.

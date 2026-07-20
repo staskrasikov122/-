@@ -60,7 +60,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
         LocalLiquidBackdrop provides backdrop,
         LocalLiquidOverlay provides overlayState,
     ) {
-        Box(Modifier.fillMaxSize().background(Color(0xFFE9F2F6))) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF0E0508))) {
             // Source and consumers are siblings. This ordering is intentional and mandatory.
             LiquidSceneBackground(Modifier.fillMaxSize().layerBackdrop(backdrop))
             content()
@@ -69,7 +69,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0x3B29293A))
+                        .background(Color(0x8F121212))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -87,7 +87,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
 private fun LiquidSceneBackground(modifier: Modifier = Modifier) {
     // Обои без скрима — как в каталоге Kyant: стеклу нужен живой фон.
     Image(
-        painter = painterResource(R.drawable.kyant_wallpaper_light),
+        painter = painterResource(R.drawable.admin_wallpaper),
         contentDescription = null,
         modifier = modifier,
         contentScale = ContentScale.Crop,

@@ -180,18 +180,25 @@ private fun biometricError(context: Context, code: Int): String = when (code) {
     else -> "Системная аутентификация недоступна ($code)"
 }
 
+// Четыре вкладки в нижнем баре; «операции» открываются шестерёнкой в верхней панели.
 private val adminNavigation = listOf(
     AdminNavItem(Section.Dashboard, "обзор", AdminIcons.Dashboard),
     AdminNavItem(Section.AppConfig, "конфиг", AdminIcons.Tune),
     AdminNavItem(Section.Announce, "пуши", AdminIcons.Notifications),
     AdminNavItem(Section.Devices, "устройства", AdminIcons.Devices),
-    AdminNavItem(Section.Operations, "операции", AdminIcons.Settings),
 )
 
 @Composable
 private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
     Column(Modifier.fillMaxSize()) {
-        AdminTopBar(viewModel::refreshAll, viewModel::lock, state.backend, viewModel::selectBackend)
+        AdminTopBar(
+            onRefresh = viewModel::refreshAll,
+            onLock = viewModel::lock,
+            onOperations = { viewModel.selectSection(Section.Operations) },
+            operationsActive = state.section == Section.Operations,
+            backend = state.backend,
+            onBackend = viewModel::selectBackend,
+        )
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (state.backend == Backend.GlassFiles) {
                 GlassFilesPlaceholderV3()
