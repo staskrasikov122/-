@@ -17,7 +17,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -70,7 +69,7 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0x40202834))
+                        .background(Color(0x3B29293A))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -86,27 +85,13 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
 
 @Composable
 private fun LiquidSceneBackground(modifier: Modifier = Modifier) {
-    Box(modifier) {
-        Image(
-            painter = painterResource(R.drawable.kyant_wallpaper_light),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop,
-        )
-        // Мягкий скрим: приглушает обои, чтобы контент и заголовки оставались читаемыми,
-        // при этом стеклянные элементы преломляют уже "успокоенный" фон.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color(0xA6F4F9FB),
-                        0.4f to Color(0x66F4F9FB),
-                        1f to Color(0x8CF4F9FB),
-                    ),
-                ),
-        )
-    }
+    // Обои без скрима — как в каталоге Kyant: стеклу нужен живой фон.
+    Image(
+        painter = painterResource(R.drawable.kyant_wallpaper_light),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Crop,
+    )
 }
 
 @Composable

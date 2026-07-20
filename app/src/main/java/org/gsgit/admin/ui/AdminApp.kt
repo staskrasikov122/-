@@ -79,7 +79,7 @@ private fun AdminKeyScreen(error: String?, checking: Boolean, onUnlock: (String)
     var key by rememberSaveable { mutableStateOf("") }
     Box(Modifier.fillMaxSize().safeDrawingPadding().padding(22.dp), contentAlignment = Alignment.Center) {
         AdminCard(Modifier.widthIn(max = 460.dp), elevated = true) {
-            AdminText("[ Админ GsGit ]", color = AdminTheme.colors.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            AdminText("Админ GsGit", color = AdminTheme.colors.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(7.dp))
             AdminText("панель управления заблокирована", color = AdminTheme.colors.textMuted, fontSize = 11.sp)
             Spacer(Modifier.height(16.dp))
@@ -158,7 +158,7 @@ private fun BiometricScreen(
 
     Box(Modifier.fillMaxSize().safeDrawingPadding().padding(22.dp), contentAlignment = Alignment.Center) {
         AdminCard(Modifier.widthIn(max = 460.dp), elevated = true) {
-            AdminText("> защищённый вход", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            AdminText("Защищённый вход", fontSize = 19.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             AdminText("Сохранённый ключ остаётся зашифрованным. Подтвердите личность системным способом.", color = AdminTheme.colors.textSecondary, fontSize = 11.sp)
             if (!error.isNullOrBlank()) {
@@ -181,11 +181,11 @@ private fun biometricError(context: Context, code: Int): String = when (code) {
 }
 
 private val adminNavigation = listOf(
-    AdminNavItem(Section.Dashboard, "обзор", "◉"),
-    AdminNavItem(Section.AppConfig, "конфиг", "≡"),
-    AdminNavItem(Section.Announce, "пуши", "⌁"),
-    AdminNavItem(Section.Devices, "устройства", "◇"),
-    AdminNavItem(Section.Operations, "операции", "⚙"),
+    AdminNavItem(Section.Dashboard, "обзор", AdminIcons.Dashboard),
+    AdminNavItem(Section.AppConfig, "конфиг", AdminIcons.Tune),
+    AdminNavItem(Section.Announce, "пуши", AdminIcons.Notifications),
+    AdminNavItem(Section.Devices, "устройства", AdminIcons.Devices),
+    AdminNavItem(Section.Operations, "операции", AdminIcons.Settings),
 )
 
 @Composable
@@ -213,7 +213,7 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
 private fun GlassFilesPlaceholderV3() {
     Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         AdminCard(Modifier.widthIn(max = 520.dp)) {
-            AdminText("[ GlassFiles ]", color = AdminTheme.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            AdminText("GlassFiles", color = AdminTheme.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             AdminText("Контракт API пока не подключён. Вымышленные запросы не выполняются.", color = AdminTheme.colors.textMuted)
         }

@@ -32,8 +32,8 @@ data class AdminColors(
 
 val AdminDarkColors = AdminColors(
     background = Color(0xFFE9F2F6),
-    surface = Color(0xB8FFFFFF),
-    surfaceElevated = Color(0xE3FFFFFF),
+    surface = Color(0x99FAFAFA),
+    surfaceElevated = Color(0xA6FAFAFA),
     border = Color(0x1A15202B),
     accent = Color(0xFF0088FF),
     accentDim = Color(0xFF0066CC),
