@@ -15,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.paint
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -42,8 +41,8 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.shapes.Capsule
 import com.kyant.shapes.RoundedRectangle
 import kotlinx.coroutines.delay
-import org.gsgit.admin.ui.kyant.components.LiquidBottomTab
-import org.gsgit.admin.ui.kyant.components.LiquidBottomTabsBare
+import org.gsgit.admin.ui.kyant.components.GlassBottomTabBar
+import org.gsgit.admin.ui.kyant.components.GlassTabItem
 import org.gsgit.admin.ui.kyant.components.LiquidButton
 import org.gsgit.admin.ui.kyant.components.LiquidToggle
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
@@ -55,8 +54,8 @@ import org.gsgit.admin.ui.theme.AdminTheme
 //  * панель с текстом = тёмный вариант его DialogContent:
 //    colorControls(0, 1.5) + blur(8dp) + lens(24dp, 48dp, depthEffect) + поверхность 121212;
 //  * все кнопки — стеклянные LiquidButton (tinted / surface из ButtonsContent);
-//  * нижний бар без подложки: вкладки на обоях, выбранную показывает
-//    стеклянная капсула-индикатор (LiquidBottomTabsBare).
+//  * нижний бар — GlassBottomTabBar, портирован из GlassFiles: парящая
+//    капсула с усиленной линзой, индикатор резкий.
 
 // Полупрозрачные поверхности стеклянных контролов: на тёмных обоях цвет
 // должен пропускать фон, иначе стекло читается как сплошной пластик.
@@ -430,34 +429,18 @@ data class AdminNavItem(val section: Section, val label: String, val icon: Image
 
 @Composable
 fun AdminBottomBar(items: List<AdminNavItem>, selected: Section, onSelect: (Section) -> Unit) {
-    val colors = AdminTheme.colors
     val rawIndex = items.indexOfFirst { it.section == selected }
     // Когда открыт раздел вне бара (операции), индикатор остаётся на последней вкладке.
     var lastIndex by rememberSaveable { mutableIntStateOf(0) }
     if (rawIndex >= 0 && rawIndex != lastIndex) lastIndex = rawIndex
-    val selectedIndexState = rememberUpdatedState(if (rawIndex >= 0) rawIndex else lastIndex)
-    val iconTint = ColorFilter.tint(colors.textPrimary)
-    Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 8.dp)) {
-        LiquidBottomTabsBare(
-            // Стабильная лямбда: новая на каждую рекомпозицию сбрасывает внутреннее
-            // состояние табов, и индикатор "залипает" на чужой вкладке.
-            selectedTabIndex = remember { { selectedIndexState.value } },
-            onTabSelected = { index -> items.getOrNull(index)?.let { onSelect(it.section) } },
-            backdrop = LocalLiquidBackdrop.current,
-            tabsCount = items.size,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            items.forEach { item ->
-                // Контент вкладок одного цвета: выбранную показывает стеклянный
-                // индикатор, сквозь который проступает акцентный слой.
-                val painter = rememberVectorPainter(item.icon)
-                LiquidBottomTab(onClick = { onSelect(item.section) }) {
-                    Box(Modifier.size(24.dp).paint(painter, colorFilter = iconTint))
-                    AdminText(item.label, color = colors.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Medium, maxLines = 1, softWrap = false)
-                }
-            }
-        }
-    }
+    val tabs = remember(items) { items.map { GlassTabItem(it.icon, it.label) } }
+    GlassBottomTabBar(
+        backdrop = LocalLiquidBackdrop.current,
+        selectedTab = if (rawIndex >= 0) rawIndex else lastIndex,
+        onTabSelected = { index -> items.getOrNull(index)?.let { onSelect(it.section) } },
+        tabs = tabs,
+        modifier = Modifier.navigationBarsPadding(),
+    )
 }
 
 @Composable

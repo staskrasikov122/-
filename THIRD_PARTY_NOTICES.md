@@ -16,8 +16,8 @@
 `DampedDragAnimation`, `DragGestureInspector` и Android-обёртка `awaitFrame`.
 Изменены namespace/import для обычного Android-модуля, а также смягчены
 константы анимаций (жёсткость пружин в `DampedDragAnimation`, масштаб нажатия
-в `LiquidToggle`). `LiquidBottomTabsBare` — адаптация `LiquidBottomTabs` без
-стеклянной подложки, на основе того же снимка.
+в `LiquidToggle`). `GlassBottomTabBar` перенесён из проекта GlassFiles автора
+приложения и построен на тех же компонентах Backdrop.
 
 Copyright Kyant0. Licensed under the Apache License, Version 2.0.
 
