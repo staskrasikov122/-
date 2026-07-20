@@ -39,7 +39,6 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
@@ -53,8 +52,9 @@ import kotlin.math.abs
 import kotlin.math.sign
 
 /**
- * Вариант [LiquidBottomTabs] без стеклянной подложки: вкладки лежат прямо на
- * фоне, а выбранную показывает плавающая стеклянная капсула-индикатор.
+ * Вариант [LiquidBottomTabs] без матовой подложки: контейнер — чистое стекло
+ * (только линза и блик, без заливки и blur), сквозь которое видно искажённые
+ * обои; выбранную вкладку показывает резкая стеклянная капсула-индикатор.
  * Цвета зафиксированы под тёмную тему приложения.
  */
 @Composable
@@ -141,16 +141,28 @@ fun LiquidBottomTabsBare(
                 }
         }
 
-        // Видимый ряд вкладок — без стекла и без подложки.
+        // Контейнер — чистое стекло без заливки: только преломление (lens)
+        // и блик по краю, как прозрачные панели каталога Kyant. Никакой
+        // матовой подложки — сквозь бар видно искажённые обои.
         Row(
             Modifier
                 .graphicsLayer {
                     translationX = panelOffset
-                    val progress = dampedDragAnimation.pressProgress
-                    val scale = lerp(1f, 1f + 8f.dp.toPx() / size.width, progress)
-                    scaleX = scale
-                    scaleY = scale
                 }
+                .drawBackdrop(
+                    backdrop = backdrop,
+                    shape = { Capsule() },
+                    effects = {
+                        vibrancy()
+                        lens(16f.dp.toPx(), 32f.dp.toPx())
+                    },
+                    layerBlock = {
+                        val progress = dampedDragAnimation.pressProgress
+                        val scale = lerp(1f, 1f + 8f.dp.toPx() / size.width, progress)
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                )
                 .height(64f.dp)
                 .fillMaxWidth()
                 .padding(4f.dp),
@@ -195,12 +207,11 @@ fun LiquidBottomTabsBare(
                     backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
                     shape = { Capsule() },
                     effects = {
-                        vibrancy()
-                        blur(2f.dp.toPx())
+                        // Без blur: капсула резкая, только линза.
                         val progress = dampedDragAnimation.pressProgress
                         lens(
-                            10f.dp.toPx() + 6f.dp.toPx() * progress,
-                            20f.dp.toPx() + 8f.dp.toPx() * progress,
+                            10f.dp.toPx() + 4f.dp.toPx() * progress,
+                            18f.dp.toPx() + 8f.dp.toPx() * progress,
                             chromaticAberration = progress > 0.01f
                         )
                     },
