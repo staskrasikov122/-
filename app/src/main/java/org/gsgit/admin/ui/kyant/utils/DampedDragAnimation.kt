@@ -28,18 +28,18 @@ class DampedDragAnimation(
     val onDrag: DampedDragAnimation.(size: IntSize, dragAmount: Offset) -> Unit,
 ) {
 
-    // Пружины смягчены относительно оригинала Kyant (1000f/250f):
-    // меньше жёсткость — плавнее скольжение индикатора и тумблеров.
+    // Точные спеки пружин из LiquidGlassKit (LiquidMusicGlass/GlassFiles):
+    // низкая жёсткость 60–200 + лёгкое недодемпфирование = «жидкая» инерция.
     private val valueAnimationSpec =
-        spring(0.9f, 380f, visibilityThreshold)
+        spring(0.75f, 60f, visibilityThreshold)
     private val velocityAnimationSpec =
-        spring(0.5f, 300f, visibilityThreshold * 10f)
+        spring(0.5f, 150f, visibilityThreshold * 10f)
     private val pressProgressAnimationSpec =
-        spring(1f, 420f, 0.001f)
+        spring(0.85f, 200f, 0.001f)
     private val scaleXAnimationSpec =
-        spring(0.7f, 170f, 0.001f)
+        spring(0.6f, 120f, 0.001f)
     private val scaleYAnimationSpec =
-        spring(0.75f, 170f, 0.001f)
+        spring(0.7f, 120f, 0.001f)
 
     private val valueAnimation =
         Animatable(initialValue, visibilityThreshold)
@@ -111,6 +111,14 @@ class DampedDragAnimation(
         val targetValue = value.coerceIn(valueRange)
         animationScope.launch {
             launch { valueAnimation.animateTo(targetValue, valueAnimationSpec) { updateVelocity() } }
+        }
+    }
+
+    fun snapToValue(value: Float) {
+        val targetValue = value.coerceIn(valueRange)
+        animationScope.launch {
+            valueAnimation.snapTo(targetValue)
+            updateVelocity()
         }
     }
 

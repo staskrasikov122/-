@@ -72,8 +72,8 @@ fun LiquidToggle(
             valueRange = 0f..1f,
             visibilityThreshold = 0.001f,
             initialScale = 1f,
-            // Мягче, чем 1.5f у Kyant: без резкого прыжка при нажатии.
-            pressedScale = 1.2f,
+            // 1.5f по спеке LiquidGlassKit: с мягкими пружинами прыжка нет.
+            pressedScale = 1.5f,
             onDragStarted = {},
             onDragStopped = {
                 if (didDrag) {
