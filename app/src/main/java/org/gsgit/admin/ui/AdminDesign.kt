@@ -11,6 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.BasicText
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.isSpecified
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalDensity
@@ -201,9 +203,23 @@ fun AdminIcon(imageVector: ImageVector, description: String?, modifier: Modifier
 }
 
 @Composable
-fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+fun AdminCard(
+    modifier: Modifier = Modifier,
+    elevated: Boolean = false,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     val backdrop = LocalLiquidBackdrop.current
     val contentBackdrop = rememberLayerBackdrop()
+    // Пресс-сжатие кликабельной карточки — только через layerBlock:
+    // внешний graphicsLayer ломает сэмплинг backdrop.
+    var pressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        if (pressed && onClick != null) LiquidMotion.PressCard else 1f,
+        LiquidMotion.snappy(),
+        label = "cardPress",
+    )
+    val currentOnClick by rememberUpdatedState(onClick)
     // Настройки стекла читаются ВНУТРИ draw-лямбд (как в плейграунде Kyant):
     // изменение слайдера инвалидирует только отрисовку, без рекомпозиций.
     Column(
@@ -211,6 +227,10 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
             .fillMaxWidth()
             .drawBackdrop(
                 backdrop = backdrop,
+                layerBlock = {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                },
                 shape = {
                     val g = GlassSettingsStore.state.value
                     RoundedRectangle((if (elevated) g.cardCornerRadius * 1.5f else g.cardCornerRadius).dp)
@@ -243,6 +263,17 @@ fun AdminCard(modifier: Modifier = Modifier, elevated: Boolean = false, content:
                     val alpha = (g.cardSurfaceAlpha + if (elevated) 0.15f else 0f).coerceIn(0f, 1f)
                     drawRect(tint.copy(alpha = alpha))
                 },
+            )
+            .then(
+                if (onClick != null) Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            pressed = true
+                            try { awaitRelease() } finally { pressed = false }
+                        },
+                        onTap = { currentOnClick?.invoke() },
+                    )
+                } else Modifier
             )
             .padding(horizontal = if (elevated) 24.dp else 18.dp, vertical = if (elevated) 22.dp else 16.dp),
     ) {
@@ -412,13 +443,25 @@ fun AdminIconAction(
     val colors = AdminTheme.colors
     val backdrop = LocalLiquidSceneBackdrop.current
     val tint = colors.accent
+    // Пресс-сжатие ТОЛЬКО через layerBlock: внешний graphicsLayer ломает
+    // сэмплинг backdrop (Kyant компенсирует лишь собственный layerBlock).
+    var pressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        if (pressed && enabled) LiquidMotion.PressIcon else 1f,
+        LiquidMotion.snappy(),
+        label = "iconPress",
+    )
+    val currentOnClick by rememberUpdatedState(onClick)
     Box(
         modifier
             .alpha(if (enabled) 1f else 0.5f)
-            .liquidClickable(enabled = enabled, pressedScale = LiquidMotion.PressIcon, onClick = onClick)
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { Capsule() },
+                layerBlock = {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                },
                 effects = {
                     val g = GlassSettingsStore.state.value
                     if (g.vibrancy) vibrancy()
@@ -449,6 +492,16 @@ fun AdminIconAction(
                 },
             )
             .clip(Capsule())
+            .pointerInput(enabled) {
+                if (!enabled) return@pointerInput
+                detectTapGestures(
+                    onPress = {
+                        pressed = true
+                        try { awaitRelease() } finally { pressed = false }
+                    },
+                    onTap = { currentOnClick() },
+                )
+            }
             .size(42.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -533,12 +586,24 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
         selected -> colors.accent
         else -> Color.Unspecified
     }
+    // Пресс-сжатие только через layerBlock — внешний graphicsLayer ломает
+    // сэмплинг backdrop у маленьких контролов.
+    var pressed by remember { mutableStateOf(false) }
+    val pressScale by animateFloatAsState(
+        if (pressed) LiquidMotion.PressButton else 1f,
+        LiquidMotion.snappy(),
+        label = "chipPress",
+    )
+    val currentOnClick by rememberUpdatedState(onClick)
     Row(
         Modifier
-            .then(if (onClick != null) Modifier.liquidClickable(pressedScale = LiquidMotion.PressButton, onClick = onClick) else Modifier)
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { Capsule() },
+                layerBlock = {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                },
                 effects = {
                     val g = GlassSettingsStore.state.value
                     if (g.vibrancy) vibrancy()
@@ -569,6 +634,17 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                 },
             )
             .clip(Capsule())
+            .then(
+                if (onClick != null) Modifier.pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            pressed = true
+                            try { awaitRelease() } finally { pressed = false }
+                        },
+                        onTap = { currentOnClick?.invoke() },
+                    )
+                } else Modifier
+            )
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

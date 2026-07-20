@@ -225,7 +225,7 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
         item { AdminSectionLabel("история", Modifier.padding(start = 4.dp, top = 6.dp)) }
         when (val history = state.announcements) {
             is LoadState.Ready -> if (history.value.items.isEmpty()) item { AdminCard { AdminText("рассылок пока нет", color = AdminTheme.colors.textMuted) } } else itemsIndexed(history.value.items, key = { _, it -> it.id }) { itemIndex, record -> AnimatedListItem(itemIndex) {
-                AdminCard(Modifier.liquidClickable(pressedScale = LiquidMotion.PressCard) { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
+                AdminCard(onClick = { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AdminText(record.title.ifBlank { "без заголовка" }, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         AdminChip(record.status, selected = record.failed == 0, destructive = record.failed > 0)
@@ -285,7 +285,7 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
                 item { AdminText("аккаунтов: ${response.value.logins} · устройств: ${response.value.totalDevices}", color = AdminTheme.colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp)) }
                 if (response.value.devices.isEmpty()) item { AdminCard { AdminText("устройства не найдены", color = AdminTheme.colors.textMuted) } }
                 itemsIndexed(response.value.devices, key = { _, it -> it.login }) { itemIndex, group -> AnimatedListItem(itemIndex) {
-                    AdminCard(Modifier.liquidClickable(pressedScale = LiquidMotion.PressCard) { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
+                    AdminCard(onClick = { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) { AdminText("@${group.login}", fontWeight = FontWeight.Bold); AdminText("устройств: ${group.count}", color = AdminTheme.colors.textMuted, fontSize = 10.sp) }
                             AdminText(if (group.login in expanded) "⌃" else "⌄", color = AdminTheme.colors.accent, fontSize = 16.sp)
