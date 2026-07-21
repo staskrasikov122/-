@@ -3,6 +3,8 @@ package org.gsgit.admin.data
 object ConfigValidator {
     private val versionPattern = Regex("^\\d+\\.\\d+\\.\\d+$")
 
+    fun isValidVersion(version: String): Boolean = versionPattern.matches(version)
+
     fun validate(config: AppConfig): String? {
         if (!versionPattern.matches(config.latestVersion)) return "Последняя версия должна быть в формате x.y.z"
         if (!versionPattern.matches(config.minVersion)) return "Минимальная версия должна быть в формате x.y.z"

@@ -84,7 +84,7 @@ data class ConfigRevision(
     val snapshot: AppConfig? = null,
 )
 
-data class Announcement(val title: String, val body: String, val url: String)
+data class Announcement(val title: String = "", val body: String = "", val url: String = "")
 data class AnnouncementResult(val delivered: Int)
 
 data class AnnouncementRecord(
@@ -122,6 +122,21 @@ data class ReleaseRecord(
     val createdAt: String = "",
     val publishedAt: String = "",
 )
+
+data class ReleaseReadiness(
+    val release: ReleaseRecord,
+    val serverAvailable: Boolean,
+    val firebaseAvailable: Boolean,
+    val versionValid: Boolean,
+    val apkSpecified: Boolean,
+    val shaSpecified: Boolean,
+    val apkVerification: ApkVerification?,
+    val blockedClients: Int,
+) {
+    val ready: Boolean
+        get() = serverAvailable && firebaseAvailable && versionValid && apkSpecified && shaSpecified &&
+            apkVerification?.matches == true
+}
 
 data class AuditRecord(
     val id: String,
