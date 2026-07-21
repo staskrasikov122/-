@@ -4,6 +4,8 @@ import android.app.Application
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +37,7 @@ data class AdminUiState(
     val auth: AuthState = AuthState.Restoring,
     val backend: Backend = Backend.GsGit,
     val section: Section = Section.Dashboard,
+    val operationsTab: String = "maintenance",
     val stats: LoadState<AdminStats> = LoadState.Idle,
     val health: LoadState<HealthStatus> = LoadState.Idle,
     val metrics: LoadState<AdminMetrics> = LoadState.Idle,
@@ -48,21 +51,31 @@ data class AdminUiState(
     val releases: LoadState<Page<ReleaseRecord>> = LoadState.Idle,
     val audit: LoadState<Page<AuditRecord>> = LoadState.Idle,
     val errors: LoadState<List<ServerErrorRecord>> = LoadState.Idle,
+    val configRevisionDetails: LoadState<ConfigRevision> = LoadState.Idle,
+    val releaseReadiness: LoadState<ReleaseReadiness> = LoadState.Idle,
     val savingConfig: Boolean = false,
     val sendingAnnouncement: Boolean = false,
     val togglingKillSwitch: Boolean = false,
     val busyAction: String? = null,
     val biometricEnabled: Boolean = true,
     val lockTimeoutMinutes: Int = 5,
+    val autoRefreshSeconds: Int = 0,
+    val configDraft: AppConfig? = null,
+    val configReasonDraft: String = "",
+    val announcementDraft: Announcement = Announcement(),
+    val releaseDraft: ReleaseRecord = ReleaseRecord(""),
 )
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val api = AdminApi()
     private val keyStore = AdminKeyStore(application)
     private val securityStore = AdminSecurityStore(application)
+    private val draftStore = AdminDraftStore(application)
+    private val apkVerifier = ApkVerifier()
     private var sessionKey: String? = null
     private var pendingSavedKey: String? = null
     private var backgroundAtMs: Long? = null
+    private var autoRefreshJob: Job? = null
 
     private val _state = MutableStateFlow(AdminUiState())
     val state = _state.asStateFlow()
@@ -75,9 +88,15 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         _state.update {
+            val configDraft = draftStore.readConfig()
             it.copy(
                 biometricEnabled = securityStore.biometricEnabled,
                 lockTimeoutMinutes = securityStore.lockTimeoutMinutes,
+                autoRefreshSeconds = securityStore.autoRefreshSeconds,
+                configDraft = configDraft?.first,
+                configReasonDraft = configDraft?.second.orEmpty(),
+                announcementDraft = draftStore.readAnnouncement() ?: Announcement(),
+                releaseDraft = draftStore.readRelease() ?: ReleaseRecord(""),
             )
         }
         keyStore.read()?.let { savedKey ->
@@ -88,6 +107,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 validateKey(savedKey, persisted = true)
             }
         } ?: _state.update { it.copy(auth = AuthState.Locked()) }
+        restartAutoRefresh()
     }
 
     fun unlock(key: String) {
@@ -122,6 +142,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             auth = AuthState.Locked(),
             biometricEnabled = securityStore.biometricEnabled,
             lockTimeoutMinutes = securityStore.lockTimeoutMinutes,
+            autoRefreshSeconds = securityStore.autoRefreshSeconds,
+            configDraft = draftStore.readConfig()?.first,
+            configReasonDraft = draftStore.readConfig()?.second.orEmpty(),
+            announcementDraft = draftStore.readAnnouncement() ?: Announcement(),
+            releaseDraft = draftStore.readRelease() ?: ReleaseRecord(""),
         )
     }
 
@@ -165,6 +190,43 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(lockTimeoutMinutes = minutes) }
     }
 
+    fun setAutoRefresh(seconds: Int) {
+        if (seconds !in AdminSecurityStore.ALLOWED_REFRESH_INTERVALS) return
+        securityStore.autoRefreshSeconds = seconds
+        _state.update { it.copy(autoRefreshSeconds = seconds) }
+        restartAutoRefresh()
+    }
+
+    fun saveConfigDraft(config: AppConfig, reason: String) {
+        draftStore.saveConfig(config, reason)
+        _state.update { it.copy(configDraft = config, configReasonDraft = reason) }
+    }
+
+    fun clearConfigDraft() {
+        draftStore.clearConfig()
+        _state.update { it.copy(configDraft = null, configReasonDraft = "") }
+    }
+
+    fun saveAnnouncementDraft(value: Announcement) {
+        draftStore.saveAnnouncement(value)
+        _state.update { it.copy(announcementDraft = value) }
+    }
+
+    fun clearAnnouncementDraft() {
+        draftStore.clearAnnouncement()
+        _state.update { it.copy(announcementDraft = Announcement()) }
+    }
+
+    fun saveReleaseDraft(value: ReleaseRecord) {
+        draftStore.saveRelease(value)
+        _state.update { it.copy(releaseDraft = value) }
+    }
+
+    fun clearReleaseDraft() {
+        draftStore.clearRelease()
+        _state.update { it.copy(releaseDraft = ReleaseRecord("")) }
+    }
+
     fun selectBackend(backend: Backend) = _state.update { it.copy(backend = backend) }
 
     fun selectSection(section: Section) {
@@ -176,6 +238,17 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             Section.Devices -> loadDevices()
             Section.Operations -> loadOperations()
         }
+        restartAutoRefresh()
+    }
+
+    fun openOperations(tab: String) {
+        _state.update { it.copy(section = Section.Operations, operationsTab = tab) }
+        loadOperations()
+        restartAutoRefresh()
+    }
+
+    fun showMessage(message: String) {
+        _messages.tryEmit(message)
     }
 
     fun refreshAll() {
@@ -210,10 +283,29 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun loadConfigHistory() = loadInto({ copy(configHistory = it) }) { api.getConfigHistory(requireKey()) }
     fun loadAnnouncements() = loadInto({ copy(announcements = it) }) { api.getAnnouncements(requireKey()) }
 
+    fun loadMoreConfigHistory() = loadMorePage(
+        name = "config.history.more",
+        current = { _state.value.configHistory },
+        loader = { cursor -> api.getConfigHistory(requireKey(), cursor = cursor) },
+        reducer = { copy(configHistory = it) },
+    )
+
+    fun loadMoreAnnouncements() = loadMorePage(
+        name = "announcements.more",
+        current = { _state.value.announcements },
+        loader = { cursor -> api.getAnnouncements(requireKey(), cursor = cursor) },
+        reducer = { copy(announcements = it) },
+    )
+
     fun loadAnnouncementDetails(id: String) =
         loadInto({ copy(announcementDetails = it) }) { api.getAnnouncement(requireKey(), id) }
 
+    fun loadConfigRevision(revision: Int) =
+        loadInto({ copy(configRevisionDetails = it) }) { api.getConfigRevision(requireKey(), revision) }
+
     fun loadOperations() {
+        loadStats()
+        loadHealth()
         loadMaintenance()
         loadReleases()
         loadAudit()
@@ -224,6 +316,20 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun loadReleases() = loadInto({ copy(releases = it) }) { api.getReleases(requireKey()) }
     fun loadAudit() = loadInto({ copy(audit = it) }) { api.getAudit(requireKey()) }
     fun loadErrors(service: String = "") = loadInto({ copy(errors = it) }) { api.getErrors(requireKey(), service) }
+
+    fun loadMoreReleases() = loadMorePage(
+        name = "releases.more",
+        current = { _state.value.releases },
+        loader = { cursor -> api.getReleases(requireKey(), cursor = cursor) },
+        reducer = { copy(releases = it) },
+    )
+
+    fun loadMoreAudit() = loadMorePage(
+        name = "audit.more",
+        current = { _state.value.audit },
+        loader = { cursor -> api.getAudit(requireKey(), cursor = cursor) },
+        reducer = { copy(audit = it) },
+    )
 
     fun saveConfig(config: AppConfig, reason: String) {
         val localError = ConfigValidator.validate(config)
@@ -242,6 +348,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val updated = api.saveAppConfig(requireKey(), config, reason)
                 _state.update { it.copy(config = LoadState.Ready(updated)) }
+                clearConfigDraft()
                 _messages.emit("Настройки проверены и сохранены")
                 loadStats()
                 loadConfigHistory()
@@ -291,6 +398,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val result = api.announce(requireKey(), Announcement(title.trim(), body.trim(), url.trim()))
                 _messages.emit("Доставлено на устройства: ${result.delivered}")
+                clearAnnouncementDraft()
                 onSuccess()
                 loadStats()
                 loadAnnouncements()
@@ -361,13 +469,68 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
 
     fun saveRelease(release: ReleaseRecord) = action("release.save") {
         if (release.version.isBlank()) throw ApiFailure.BadRequest("Введите версию релиза")
+        if (!ConfigValidator.isValidVersion(release.version)) throw ApiFailure.BadRequest("Версия должна быть в формате x.y.z")
+        if (release.sha256.isNotBlank() && !Regex("^[0-9a-fA-F]{64}$").matches(release.sha256)) {
+            throw ApiFailure.BadRequest("SHA-256 должен содержать 64 шестнадцатеричных символа")
+        }
         api.saveRelease(requireKey(), release)
+        clearReleaseDraft()
         loadReleases(); loadAudit()
         "Релиз ${release.version} сохранён"
     }
 
+    fun checkReleaseReadiness(release: ReleaseRecord) {
+        if (_state.value.busyAction != null) return
+        _state.update { it.copy(busyAction = "release.readiness.${release.version}", releaseReadiness = LoadState.Loading) }
+        viewModelScope.launch {
+            try {
+                if (!ConfigValidator.isValidVersion(release.version)) {
+                    throw ApiFailure.BadRequest("Версия должна быть в формате x.y.z")
+                }
+                val health = api.getHealth(requireKey())
+                val devices = api.getDevices(requireKey())
+                val verification = apkVerifier.verify(release.url.trim(), release.sha256.trim())
+                val blockedClients = if (release.mandatory) {
+                    devices.devices.sumOf { group ->
+                        group.devices.count { device -> compareVersions(device.appVersion, release.version) < 0 }
+                    }
+                } else {
+                    0
+                }
+                val readiness = ReleaseReadiness(
+                    release = release,
+                    serverAvailable = health.status.equals("ok", true) && health.database.equals("ok", true),
+                    firebaseAvailable = health.firebase.equals("ok", true),
+                    versionValid = true,
+                    apkSpecified = release.url.isNotBlank(),
+                    shaSpecified = release.sha256.isNotBlank(),
+                    apkVerification = verification,
+                    blockedClients = blockedClients,
+                )
+                _state.update { it.copy(releaseReadiness = LoadState.Ready(readiness)) }
+                if (!readiness.ready) _messages.emit("Релиз не прошёл проверку готовности")
+            } catch (failure: ApiFailure) {
+                onRequestFailure(failure) { message ->
+                    _state.update { it.copy(releaseReadiness = LoadState.Error(message)) }
+                    _messages.tryEmit(message)
+                }
+            } finally {
+                _state.update { it.copy(busyAction = null) }
+            }
+        }
+    }
+
+    fun clearReleaseReadiness() {
+        _state.update { it.copy(releaseReadiness = LoadState.Idle) }
+    }
+
     fun publishRelease(version: String) = action("release.publish.$version") {
+        val readiness = (_state.value.releaseReadiness as? LoadState.Ready)?.value
+        if (readiness == null || readiness.release.version != version || !readiness.ready) {
+            throw ApiFailure.BadRequest("Сначала выполните успешную проверку готовности релиза")
+        }
         api.publishRelease(requireKey(), version)
+        clearReleaseReadiness()
         loadReleases(); loadConfig(); loadStats(); loadAudit()
         "Релиз $version опубликован"
     }
@@ -402,6 +565,68 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 onRequestFailure(failure) { _messages.tryEmit(it) }
             } finally {
                 _state.update { it.copy(busyAction = null) }
+            }
+        }
+    }
+
+    private fun <T> loadMorePage(
+        name: String,
+        current: () -> LoadState<Page<T>>,
+        loader: suspend (String) -> Page<T>,
+        reducer: AdminUiState.(LoadState<Page<T>>) -> AdminUiState,
+    ) {
+        if (_state.value.busyAction != null) return
+        val ready = current() as? LoadState.Ready ?: return
+        val cursor = ready.value.nextCursor ?: return
+        _state.update { it.copy(busyAction = name) }
+        viewModelScope.launch {
+            try {
+                val next = loader(cursor)
+                val merged = Page(
+                    items = (ready.value.items + next.items).distinct(),
+                    nextCursor = next.nextCursor,
+                )
+                _state.update { it.reducer(LoadState.Ready(merged)) }
+            } catch (failure: ApiFailure) {
+                onRequestFailure(failure) { _messages.tryEmit(it) }
+            } finally {
+                _state.update { it.copy(busyAction = null) }
+            }
+        }
+    }
+
+    private fun restartAutoRefresh() {
+        autoRefreshJob?.cancel()
+        val seconds = _state.value.autoRefreshSeconds
+        if (seconds <= 0) return
+        autoRefreshJob = viewModelScope.launch {
+            while (true) {
+                delay(seconds * 1_000L)
+                val current = _state.value
+                if (current.auth == AuthState.Unlocked && current.backend == Backend.GsGit && current.section == Section.Dashboard) {
+                    loadDashboardSilently()
+                }
+            }
+        }
+    }
+
+    private fun loadDashboardSilently() {
+        val key = sessionKey ?: return
+        val period = _state.value.metricsPeriod
+        viewModelScope.launch {
+            try {
+                val stats = api.getStats(key)
+                val health = api.getHealth(key)
+                val metrics = api.getMetrics(key, period)
+                _state.update {
+                    it.copy(
+                        stats = LoadState.Ready(stats),
+                        health = LoadState.Ready(health),
+                        metrics = LoadState.Ready(metrics),
+                    )
+                }
+            } catch (failure: ApiFailure) {
+                onRequestFailure(failure) { _messages.tryEmit("Автообновление: $it") }
             }
         }
     }
@@ -444,4 +669,16 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         is ApiFailure.Server -> "Ошибка сервера ($status)"
         is ApiFailure.InvalidResponse -> "Сервер вернул некорректный ответ"
     }
+}
+
+private fun compareVersions(left: String, right: String): Int {
+    fun parts(value: String) = value.split('.').map { it.toIntOrNull() ?: 0 }
+    val a = parts(left)
+    val b = parts(right)
+    val size = maxOf(a.size, b.size, 3)
+    for (index in 0 until size) {
+        val comparison = (a.getOrElse(index) { 0 }).compareTo(b.getOrElse(index) { 0 })
+        if (comparison != 0) return comparison
+    }
+    return 0
 }

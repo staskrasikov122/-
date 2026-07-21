@@ -120,8 +120,8 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
         request("POST", "/admin/appconfig", key, JSONObject().put("maintenance", message)), ::parseConfig,
     )
 
-    suspend fun getConfigHistory(key: String, limit: Int = 30): Page<ConfigRevision> = parseObject(
-        request("GET", "/admin/appconfig/history?limit=$limit", key),
+    suspend fun getConfigHistory(key: String, limit: Int = 30, cursor: String? = null): Page<ConfigRevision> = parseObject(
+        request("GET", "/admin/appconfig/history?limit=$limit${cursorParam(cursor)}", key),
     ) { root -> parsePage(root) { parseRevision(it) } }
 
     suspend fun getConfigRevision(key: String, revision: Int): ConfigRevision = parseObject(
@@ -141,8 +141,8 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
         }
     }
 
-    suspend fun getAnnouncements(key: String, limit: Int = 30): Page<AnnouncementRecord> = parseObject(
-        request("GET", "/admin/announcements?limit=$limit", key),
+    suspend fun getAnnouncements(key: String, limit: Int = 30, cursor: String? = null): Page<AnnouncementRecord> = parseObject(
+        request("GET", "/admin/announcements?limit=$limit${cursorParam(cursor)}", key),
     ) { root -> parsePage(root) { parseAnnouncement(it) } }
 
     suspend fun getAnnouncement(key: String, id: String): AnnouncementRecord = parseObject(
@@ -181,8 +181,8 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
         request("POST", "/admin/maintenance/stop", key, JSONObject())
     }
 
-    suspend fun getReleases(key: String, limit: Int = 30): Page<ReleaseRecord> = parseObject(
-        request("GET", "/admin/releases?limit=$limit", key),
+    suspend fun getReleases(key: String, limit: Int = 30, cursor: String? = null): Page<ReleaseRecord> = parseObject(
+        request("GET", "/admin/releases?limit=$limit${cursorParam(cursor)}", key),
     ) { root -> parsePage(root) { parseRelease(it) } }
 
     suspend fun saveRelease(key: String, release: ReleaseRecord): ReleaseRecord = parseObject(
@@ -193,8 +193,8 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
         request("POST", "/admin/releases/${segment(version)}/publish", key, JSONObject())
     }
 
-    suspend fun getAudit(key: String, limit: Int = 100): Page<AuditRecord> = parseObject(
-        request("GET", "/admin/audit?limit=$limit", key),
+    suspend fun getAudit(key: String, limit: Int = 100, cursor: String? = null): Page<AuditRecord> = parseObject(
+        request("GET", "/admin/audit?limit=$limit${cursorParam(cursor)}", key),
     ) { root ->
         parsePage(root) {
             AuditRecord(
@@ -383,6 +383,7 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
 
     private fun segment(value: String) = URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")
     private fun query(value: String) = segment(value)
+    private fun cursorParam(cursor: String?) = cursor?.takeIf { it.isNotBlank() }?.let { "&cursor=${query(it)}" }.orEmpty()
 
     private companion object {
         const val CONNECT_TIMEOUT_MS = 10_000
