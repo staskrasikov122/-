@@ -403,7 +403,10 @@ private fun DeviceDetailsV3(device: AdminDevice, busy: Boolean, onTest: () -> Un
     AdminKeyValue("регистрация", displayDate(device.registeredAt)); AdminKeyValue("активность", displayDate(device.lastSeenAt))
     AdminKeyValue("последний пуш", "${displayDate(device.lastPushAt)} ${device.lastPushStatus}".trim().ifBlank { "нет" })
     AdminKeyValue("отложено", device.heldCount.toString()); AdminKeyValue("токен", "••••••${device.tokenTail}")
-    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    // AdminPillFlowRow вместо горизонтального скролла: скролл-контейнер обрезал
+    // растянутую капсулу по своим границам. Перенос на вторую строку показывает
+    // все кнопки целиком, а соседи по строке расталкиваются как в iOS 26.
+    AdminPillFlowRow {
         AdminPillButton("копировать ID", { copyText(context, "ID устройства", device.deviceId) }, accent = false)
         AdminPillButton("тест", onTest, enabled = !busy)
         AdminPillButton("очистить", onClear, enabled = !busy && device.heldCount > 0, accent = false)

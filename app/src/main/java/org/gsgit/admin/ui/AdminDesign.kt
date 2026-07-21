@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
@@ -33,6 +34,8 @@ import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -76,6 +79,8 @@ import org.gsgit.admin.ui.theme.AdminTheme
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.tanh
 
@@ -282,6 +287,58 @@ fun AdminCard(
 }
 
 /**
+ * Ряд капсульных кнопок в духе iOS 26: растягиваемая кнопка не наезжает на
+ * соседей — они следуют за её кромкой (зазор сохраняется), а при отпускании
+ * возвращаются теми же пружинами, что и сама кнопка. Сдвиг соседей выводится
+ * из тех же анимаций InteractiveHighlight в draw-фазе (layerBlock), поэтому
+ * рекомпозиций нет и сэмплинг backdrop не ломается.
+ */
+class LiquidPillRowState internal constructor() {
+    internal class Entry(val highlight: InteractiveHighlight) {
+        var leftX by mutableFloatStateOf(0f)
+        var topY by mutableFloatStateOf(0f)
+        var widthPx by mutableFloatStateOf(0f)
+        var heightPx by mutableFloatStateOf(0f)
+    }
+
+    internal val entries = mutableStateListOf<Entry>()
+}
+
+internal val LocalLiquidPillRow = compositionLocalOf<LiquidPillRowState?> { null }
+
+@Composable
+fun AdminPillRow(
+    modifier: Modifier = Modifier,
+    horizontalArrangement: Arrangement.Horizontal = Arrangement.spacedBy(6.dp),
+    content: @Composable RowScope.() -> Unit,
+) {
+    val state = remember { LiquidPillRowState() }
+    CompositionLocalProvider(LocalLiquidPillRow provides state) {
+        Row(modifier, horizontalArrangement = horizontalArrangement, verticalAlignment = Alignment.CenterVertically, content = content)
+    }
+}
+
+/**
+ * Многострочный вариант ряда: кнопки переносятся, а не скроллятся — ничего
+ * не обрезается. Расталкиваются только соседи своей строки (проверка по topY).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AdminPillFlowRow(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val state = remember { LiquidPillRowState() }
+    CompositionLocalProvider(LocalLiquidPillRow provides state) {
+        FlowRow(
+            modifier,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) { content() }
+    }
+}
+
+/**
  * Стеклянная капсула с объёмом: линза + Ambient-блик + внешняя и внутренняя
  * тени + тонкая белая окантовка (рецепт GlassFab из GlassFiles). Физика
  * нажатия — как у LiquidButton Kyant.
@@ -298,8 +355,29 @@ private fun AdminGlassCapsule(
 ) {
     val animationScope = rememberCoroutineScope()
     val interactiveHighlight = remember(animationScope) { InteractiveHighlight(animationScope = animationScope) }
+    val rowState = LocalLiquidPillRow.current
+    val rowEntry = remember(rowState, interactiveHighlight) {
+        rowState?.let { LiquidPillRowState.Entry(interactiveHighlight) }
+    }
+    DisposableEffect(rowState, rowEntry) {
+        if (rowState != null && rowEntry != null) {
+            rowState.entries.add(rowEntry)
+            onDispose { rowState.entries.remove(rowEntry) }
+        } else {
+            onDispose { }
+        }
+    }
     Row(
         modifier
+            .onPlaced { coords ->
+                rowEntry?.let {
+                    val pos = coords.positionInParent()
+                    it.leftX = pos.x
+                    it.topY = pos.y
+                    it.widthPx = coords.size.width.toFloat()
+                    it.heightPx = coords.size.height.toFloat()
+                }
+            }
             .drawBackdrop(
                 // Слой сцены (обои): внутри карточки её собственный слой однотонный,
                 // и линза на нём не видна — а на обоях кнопка выглядит как блок.
@@ -325,25 +403,56 @@ private fun AdminGlassCapsule(
                 },
                 shadow = { val g = GlassSettingsStore.state.value; Shadow(radius = g.controlShadowRadius.dp, color = Color.Black.copy(alpha = g.controlShadow)) },
                 innerShadow = { val g = GlassSettingsStore.state.value; InnerShadow(radius = g.controlInnerRadius.dp, alpha = g.controlInnerShadow) },
-                layerBlock = if (enabled) {
+                layerBlock = if (enabled || rowEntry != null) {
                     {
-                        val width = size.width
-                        val heightPx = size.height
-                        val progress = interactiveHighlight.pressProgress
-                        val scale = lerp(1f, 1f + 4.dp.toPx() / size.height, progress)
-                        val maxOffset = size.minDimension
-                        val initialDerivative = 0.05f
-                        val offset = interactiveHighlight.offset
-                        translationX = maxOffset * tanh(initialDerivative * offset.x / maxOffset)
-                        translationY = maxOffset * tanh(initialDerivative * offset.y / maxOffset)
-                        val maxDragScale = 4.dp.toPx() / size.height
-                        val offsetAngle = atan2(offset.y, offset.x)
-                        scaleX = scale +
-                            maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) *
-                            (width / heightPx).fastCoerceAtMost(1f)
-                        scaleY = scale +
-                            maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) *
-                            (heightPx / width).fastCoerceAtMost(1f)
+                        if (enabled) {
+                            val width = size.width
+                            val heightPx = size.height
+                            val progress = interactiveHighlight.pressProgress
+                            val scale = lerp(1f, 1f + 4.dp.toPx() / size.height, progress)
+                            val maxOffset = size.minDimension
+                            val initialDerivative = 0.05f
+                            val offset = interactiveHighlight.offset
+                            translationX = maxOffset * tanh(initialDerivative * offset.x / maxOffset)
+                            translationY = maxOffset * tanh(initialDerivative * offset.y / maxOffset)
+                            val maxDragScale = 4.dp.toPx() / size.height
+                            val offsetAngle = atan2(offset.y, offset.x)
+                            scaleX = scale +
+                                maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) *
+                                (width / heightPx).fastCoerceAtMost(1f)
+                            scaleY = scale +
+                                maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) *
+                                (heightPx / width).fastCoerceAtMost(1f)
+                        }
+                        // Расталкивание в ряду (AdminPillRow): повторяем формулу
+                        // растяжения соседа по его же анимациям и следуем за его
+                        // кромкой — слева от него уезжаем влево, справа — вправо.
+                        if (rowState != null && rowEntry != null) {
+                            var push = 0f
+                            val siblings = rowState.entries
+                            for (i in siblings.indices) {
+                                val other = siblings[i]
+                                if (other === rowEntry) continue
+                                // Во FlowRow толкаем только соседей своей строки.
+                                if (abs(rowEntry.topY - other.topY) > other.heightPx * 0.5f) continue
+                                val progress = other.highlight.pressProgress
+                                val offset = other.highlight.offset
+                                if (progress <= 0f && offset == Offset.Zero) continue
+                                val w = other.widthPx
+                                val h = other.heightPx
+                                if (w <= 0f || h <= 0f) continue
+                                val maxOffset = min(w, h)
+                                val tx = maxOffset * tanh(0.05f * offset.x / maxOffset)
+                                val maxDragScale = 4.dp.toPx() / h
+                                val offsetAngle = atan2(offset.y, offset.x)
+                                val siblingScaleX = lerp(1f, 1f + maxDragScale, progress) +
+                                    maxDragScale * abs(cos(offsetAngle) * offset.x / max(w, h)) *
+                                    (w / h).fastCoerceAtMost(1f)
+                                val extraHalf = (siblingScaleX - 1f) * w * 0.5f
+                                push += if (rowEntry.leftX >= other.leftX) tx + extraHalf else tx - extraHalf
+                            }
+                            translationX += push
+                        }
                     }
                 } else {
                     null
@@ -706,7 +815,7 @@ fun AdminDialog(
             Spacer(Modifier.height(12.dp))
             content()
             Spacer(Modifier.height(18.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            AdminPillRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (dismissLabel.isNotBlank()) {
                     AdminPillButton(dismissLabel, onDismissRequest, Modifier.weight(1f), accent = false)
                 }
