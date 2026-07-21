@@ -52,7 +52,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.lerp
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.colorControls
@@ -216,7 +215,6 @@ fun AdminCard(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val backdrop = LocalLiquidBackdrop.current
-    val contentBackdrop = rememberLayerBackdrop()
     // Пресс-сжатие кликабельной карточки — только через layerBlock:
     // внешний graphicsLayer ломает сэмплинг backdrop.
     var pressed by remember { mutableStateOf(false) }
@@ -261,7 +259,6 @@ fun AdminCard(
                         alpha = g.highlightAlpha,
                     )
                 },
-                exportedBackdrop = contentBackdrop,
                 onDrawSurface = {
                     val g = GlassSettingsStore.state.value
                     // Цвет тонировки из hue/chroma вместо хардкода 0xFF121212.
@@ -283,7 +280,11 @@ fun AdminCard(
             )
             .padding(horizontal = if (elevated) 24.dp else 18.dp, vertical = if (elevated) 22.dp else 16.dp),
     ) {
-        CompositionLocalProvider(LocalLiquidBackdrop provides contentBackdrop) { content() }
+        // Дети (тоглы/слайдеры) преломляют сцену напрямую через
+        // LocalLiquidSceneBackdrop — как кнопки. Отдельный слой карточки под них
+        // больше не захватываем: это снимало по offscreen-захвату с каждой
+        // карточки на кадр (на списках — главный источник GPU-перегруза).
+        content()
     }
 }
 
