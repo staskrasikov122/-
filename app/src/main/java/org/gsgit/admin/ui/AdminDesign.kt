@@ -1,6 +1,7 @@
 package org.gsgit.admin.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -703,6 +704,15 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
         LiquidMotion.snappy(),
         label = "chipPress",
     )
+    // Рубберный отскок при выборе: транзиентный поп с bouncy-пружиной в момент
+    // активации (снап на 1.12 → пружина к 1.0), а не постоянное увеличение.
+    val selectPop = remember { Animatable(1f) }
+    LaunchedEffect(selected) {
+        if (selected) {
+            selectPop.snapTo(1.12f)
+            selectPop.animateTo(1f, LiquidMotion.bouncy())
+        }
+    }
     val currentOnClick by rememberUpdatedState(onClick)
     Row(
         Modifier
@@ -710,8 +720,9 @@ fun AdminChip(label: String, selected: Boolean = false, destructive: Boolean = f
                 backdrop = backdrop,
                 shape = { Capsule() },
                 layerBlock = {
-                    scaleX = pressScale
-                    scaleY = pressScale
+                    val scale = pressScale * selectPop.value
+                    scaleX = scale
+                    scaleY = scale
                 },
                 effects = {
                     val g = GlassSettingsStore.state.value

@@ -7,6 +7,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -37,6 +39,7 @@ import org.gsgit.admin.ui.kyant.components.AnimatedListItem
 import org.gsgit.admin.ui.kyant.components.LiquidSlider
 import org.gsgit.admin.ui.kyant.utils.LiquidMotion
 import org.gsgit.admin.ui.kyant.utils.liquidClickable
+import org.gsgit.admin.ui.kyant.utils.rubberOverscroll
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 import java.time.Instant
@@ -54,7 +57,7 @@ fun DashboardV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var maintenanceMessage by rememberSaveable { mutableStateOf("") }
     val maintenanceOn = stats.maintenance.isNotBlank() && !stats.maintenance.equals("off", true)
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().rubberOverscroll(), contentPadding =adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AdminPageTitle("обзор", "здоровье сервера и реальные метрики") }
         item {
             when (val health = state.health) {
@@ -174,7 +177,7 @@ fun AppConfigV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var historyQuery by rememberSaveable { mutableStateOf("") }
     val changes = remember(serverConfig, config) { configChanges(serverConfig, config) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminScreenPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().rubberOverscroll().verticalScroll(rememberScrollState()).padding(adminScreenPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AdminPageTitle("конфигурация", "проверка, предпросмотр и безопасный откат")
         AdminCard {
             AdminSectionLabel("параметры клиентов")
@@ -286,7 +289,7 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var historyQuery by rememberSaveable { mutableStateOf("") }
     val recipients = (state.stats as? LoadState.Ready)?.value?.devices
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    LazyColumn(Modifier.fillMaxSize().rubberOverscroll(), contentPadding =adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { AdminPageTitle("пуши", "рассылка, история и повтор ошибок") }
         item { AdminCard {
             AdminSectionLabel("новая рассылка")
@@ -356,7 +359,7 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var expanded by remember { mutableStateOf(setOf<String>()) }
     var deleteTarget by remember { mutableStateOf<AdminDevice?>(null) }
     var testTarget by remember { mutableStateOf<AdminDevice?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize().rubberOverscroll(), contentPadding =adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminPageTitle("устройства", "диагностика и адресные действия") }
         item { AdminCard {
             AdminTextField(query, { query = it }, label = "Фильтр по логину", placeholder = "часть логина")
@@ -454,7 +457,7 @@ fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
 private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     val context = LocalContext.current
     var starts by rememberSaveable { mutableStateOf("") }; var ends by rememberSaveable { mutableStateOf("") }; var message by rememberSaveable { mutableStateOf("") }; var confirm by rememberSaveable { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().rubberOverscroll().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         when (val maintenance = state.maintenance) {
             is LoadState.Ready -> AdminCard {
                 AdminSectionLabel("текущее состояние"); AdminKeyValue("сейчас", maintenance.value.maintenanceNow.ifBlank { "выключено" })
@@ -501,7 +504,7 @@ private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
             ReleaseRecord(version.trim(), changelog, url.trim(), sha.trim(), mandatory, rollout.toIntOrNull()?.coerceIn(0, 100) ?: 100),
         )
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize().rubberOverscroll(), contentPadding =adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminCard {
             AdminSectionLabel("добавить или обновить релиз")
             Spacer(Modifier.height(10.dp))
@@ -579,7 +582,7 @@ private fun AuditPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var query by rememberSaveable { mutableStateOf("") }
     var errorsOnly by rememberSaveable { mutableStateOf(false) }
     when (val audit = state.audit) {
-        is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize().rubberOverscroll(), contentPadding =adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             item {
                 AdminCard {
                     AdminTextField(query, { query = it }, label = "Фильтр аудита", placeholder = "действие, IP или результат")
@@ -613,7 +616,7 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("" to "все", "push" to "пуши", "github" to "GitHub", "database" to "база").forEach { (value,label) -> AdminChip(label, service == value) { service = value; viewModel.loadErrors(value) } } }
         when (val errors = state.errors) {
-            is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize().rubberOverscroll(), contentPadding =adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (errors.value.isEmpty()) item { AdminCard { AdminText("серверных ошибок нет", color = AdminTheme.colors.accent) } }
                 itemsIndexed(errors.value, key = { _, it -> it.id }) { itemIndex, error -> AnimatedListItem(itemIndex) { AdminCard { Row { AdminText(error.code, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminText("×${error.count}") }; AdminText(error.message); AdminKeyValue("сервис", error.service); AdminKeyValue("последняя", displayDate(error.lastAt)) } } }
             }
@@ -626,7 +629,7 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var logoutConfirm by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().rubberOverscroll().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         AdminCard {
             AdminSectionLabel("защита экрана")
             AdminKeyValue("скриншоты", "разрешены")
@@ -655,7 +658,7 @@ private fun GlassPanelV3() {
     // одновременно живого стекла (свёрнутые слайдеры не в композиции).
     var open by rememberSaveable { mutableStateOf("Обои") }
     fun toggle(name: String) { open = if (open == name) "" else name }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(Modifier.fillMaxSize().rubberOverscroll().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AdminExpandableSection("Обои", open == "Обои", { toggle("Обои") }) {
             Spacer(Modifier.height(4.dp))
             WallpaperPickerRow()
@@ -719,10 +722,18 @@ private fun WallpaperPickerRow() {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         AdminWallpapers.items.forEachIndexed { index, res ->
             val selected = selectedIndex == index
+            // Пружинный поп выбранной миниатюры (bouncy). Миниатюры — не стеклянные
+            // слои, поэтому graphicsLayer/scale здесь безопасен (сэмплинг не задет).
+            val selectScale by animateFloatAsState(
+                if (selected) 1.06f else 1f,
+                LiquidMotion.bouncy(),
+                label = "wallpaperSelect",
+            )
             Image(
                 painterResource(res),
                 contentDescription = "обои ${index + 1}",
                 modifier = Modifier
+                    .graphicsLayer { scaleX = selectScale; scaleY = selectScale }
                     .size(72.dp, 126.dp)
                     .clip(RoundedRectangle(16.dp))
                     .border(

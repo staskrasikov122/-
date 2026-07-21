@@ -21,12 +21,15 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.animation.core.Animatable
+import androidx.compose.ui.graphics.graphicsLayer
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import org.gsgit.admin.data.GlassSettingsStore
+import org.gsgit.admin.ui.kyant.utils.LiquidMotion
 import org.gsgit.admin.ui.liquid.LiquidScene
 import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
@@ -204,11 +207,30 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
     // проезжающий под ним контент: сцена + слой контента. Настройки стекла
     // при этом читаются в draw-фазе, так что рекомпозиций на кадр нет.
     val chromeBackdrop = rememberCombinedBackdrop(sceneBackdrop, contentLayer)
+    // Пружинный доезд контента при смене вкладки — синхронно с капсулой бара.
+    // Новый экран «влетает» с направления по индексу вкладки и оседает пружиной.
+    // Читается прогресс в graphicsLayer (draw-фаза): рекомпозиций на кадр нет.
+    val sectionIndex = adminNavigation.indexOfFirst { it.section == state.section }
+        .let { if (it >= 0) it else adminNavigation.size }
+    var prevIndex by remember { mutableStateOf(sectionIndex) }
+    val slide = remember { Animatable(0f) }
+    LaunchedEffect(state.section, state.backend) {
+        val dir = if (sectionIndex >= prevIndex) 1f else -1f
+        prevIndex = sectionIndex
+        slide.snapTo(dir)
+        slide.animateTo(0f, LiquidMotion.gentle())
+    }
     Box(Modifier.fillMaxSize()) {
         // Контент во весь экран: списки проезжают под шапкой и баром
         // (adminScreenPadding даёт им вставки). Слой контента — источник
         // для хрома; его консюмеры ниже — сиблинги, не вложены.
-        Box(Modifier.fillMaxSize().layerBackdrop(contentLayer)) {
+        Box(
+            Modifier.fillMaxSize().layerBackdrop(contentLayer).graphicsLayer {
+                val p = slide.value
+                translationX = p * size.width * 0.06f
+                alpha = 1f - kotlin.math.abs(p) * 0.35f
+            },
+        ) {
             if (state.backend == Backend.GlassFiles) {
                 GlassFilesPlaceholderV3()
             } else {
