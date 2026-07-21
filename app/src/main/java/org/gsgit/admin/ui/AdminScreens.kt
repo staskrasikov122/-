@@ -1,11 +1,13 @@
 package org.gsgit.admin.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -13,11 +15,22 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.kyant.shapes.RoundedRectangle
 import org.gsgit.admin.data.*
+import org.gsgit.admin.ui.kyant.components.AnimatedListItem
+import org.gsgit.admin.ui.kyant.components.LiquidSlider
+import org.gsgit.admin.ui.kyant.utils.LiquidMotion
+import org.gsgit.admin.ui.kyant.utils.liquidClickable
+import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 
 @Composable
@@ -31,7 +44,7 @@ fun DashboardV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var maintenanceMessage by rememberSaveable { mutableStateOf("") }
     val maintenanceOn = stats.maintenance.isNotBlank() && !stats.maintenance.equals("off", true)
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { AdminPageTitle("обзор", "здоровье сервера и реальные метрики") }
         item {
             when (val health = state.health) {
@@ -126,16 +139,27 @@ fun AppConfigV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var rollbackTarget by rememberSaveable { mutableStateOf<Int?>(null) }
     val changes = remember(serverConfig, config) { configChanges(serverConfig, config) }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminScreenPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         AdminPageTitle("конфигурация", "проверка, предпросмотр и безопасный откат")
-        AdminField(config.maintenanceSoon, { config = config.copy(maintenanceSoon = it) }, "Скоро техработы", "Пусто — предупреждение отключено", 2)
-        AdminField(config.maintenance, { config = config.copy(maintenance = it) }, "Техработы сейчас", "Полная блокировка клиентов", 3)
-        AdminField(config.latestVersion, { config = config.copy(latestVersion = it) }, "Последняя версия", "Формат x.y.z")
-        AdminField(config.minVersion, { config = config.copy(minVersion = it) }, "Минимальная версия", "Старые клиенты будут заблокированы")
-        AdminField(config.changelog, { config = config.copy(changelog = it) }, "Что нового", "Описание изменений", 5)
-        AdminField(config.downloadUrl, { config = config.copy(downloadUrl = it) }, "Ссылка на APK", "HTTPS-адрес загрузки")
-        AdminField(reason, { reason = it }, "Причина изменения", "Попадёт в ревизию и аудит", 2)
-        AdminPillButton("показать и сохранить ${changes.size} изм.", { preview = true }, Modifier.fillMaxWidth(), enabled = !state.savingConfig && changes.isNotEmpty())
+        AdminCard {
+            AdminSectionLabel("параметры клиентов")
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(config.maintenanceSoon, { config = config.copy(maintenanceSoon = it) }, "Скоро техработы", "Пусто — предупреждение отключено", 2)
+                AdminField(config.maintenance, { config = config.copy(maintenance = it) }, "Техработы сейчас", "Полная блокировка клиентов", 3)
+                AdminField(config.latestVersion, { config = config.copy(latestVersion = it) }, "Последняя версия", "Формат x.y.z")
+                AdminField(config.minVersion, { config = config.copy(minVersion = it) }, "Минимальная версия", "Старые клиенты будут заблокированы")
+                AdminField(config.changelog, { config = config.copy(changelog = it) }, "Что нового", "Описание изменений", 5)
+                AdminField(config.downloadUrl, { config = config.copy(downloadUrl = it) }, "Ссылка на APK", "HTTPS-адрес загрузки")
+            }
+        }
+        AdminCard {
+            AdminSectionLabel("применение")
+            Spacer(Modifier.height(10.dp))
+            AdminField(reason, { reason = it }, "Причина изменения", "Попадёт в ревизию и аудит", 2)
+            Spacer(Modifier.height(12.dp))
+            AdminPillButton("показать и сохранить ${changes.size} изм.", { preview = true }, Modifier.fillMaxWidth(), enabled = !state.savingConfig && changes.isNotEmpty())
+        }
         AdminCard {
             AdminSectionLabel("история конфигурации")
             Spacer(Modifier.height(7.dp))
@@ -186,20 +210,23 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var detailsOpen by rememberSaveable { mutableStateOf(false) }
     val recipients = (state.stats as? LoadState.Ready)?.value?.devices
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         item { AdminPageTitle("пуши", "рассылка, история и повтор ошибок") }
         item { AdminCard {
             AdminSectionLabel("новая рассылка")
-            Spacer(Modifier.height(8.dp))
-            AdminField(title, { title = it }, "Заголовок", "Обязательно")
-            AdminField(body, { body = it }, "Текст", "Обязательно", 4)
-            AdminField(url, { url = it }, "Ссылка", "Необязательно")
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(title, { title = it }, "Заголовок", "Обязательно")
+                AdminField(body, { body = it }, "Текст", "Обязательно", 4)
+                AdminField(url, { url = it }, "Ссылка", "Необязательно")
+            }
+            Spacer(Modifier.height(12.dp))
             AdminPillButton("отправить на ${recipients ?: 0} устройств", { sendConfirm = true }, Modifier.fillMaxWidth(), enabled = recipients != null && title.isNotBlank() && body.isNotBlank() && !state.sendingAnnouncement)
         } }
-        item { AdminSectionLabel("история") }
+        item { AdminSectionLabel("история", Modifier.padding(start = 4.dp, top = 6.dp)) }
         when (val history = state.announcements) {
-            is LoadState.Ready -> if (history.value.items.isEmpty()) item { AdminCard { AdminText("рассылок пока нет", color = AdminTheme.colors.textMuted) } } else items(history.value.items, key = { it.id }) { record ->
-                AdminCard(Modifier.clickable { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
+            is LoadState.Ready -> if (history.value.items.isEmpty()) item { AdminCard { AdminText("рассылок пока нет", color = AdminTheme.colors.textMuted) } } else itemsIndexed(history.value.items, key = { _, it -> it.id }) { itemIndex, record -> AnimatedListItem(itemIndex) {
+                AdminCard(onClick = { detailsOpen = true; viewModel.loadAnnouncementDetails(record.id) }) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AdminText(record.title.ifBlank { "без заголовка" }, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                         AdminChip(record.status, selected = record.failed == 0, destructive = record.failed > 0)
@@ -208,7 +235,7 @@ fun AnnounceV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
                     AdminKeyValue("получателей", record.targeted.toString())
                     AdminKeyValue("доставлено / ошибок", "${record.delivered} / ${record.failed}")
                 }
-            }
+            } }
             is LoadState.Error -> item { AdminCard { AdminText(history.message, color = AdminTheme.colors.error) } }
             else -> item { AdminSpinner("загрузка истории") }
         }
@@ -245,19 +272,21 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var expanded by remember { mutableStateOf(setOf<String>()) }
     var deleteTarget by remember { mutableStateOf<AdminDevice?>(null) }
     var testTarget by remember { mutableStateOf<AdminDevice?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminScreenPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminPageTitle("устройства", "диагностика и адресные действия") }
         item { AdminCard {
             AdminTextField(query, { query = it }, label = "Фильтр по логину", placeholder = "часть логина")
+            Spacer(Modifier.height(4.dp))
             AdminCheckRow("Только активные пуши", activeOnly, { activeOnly = !activeOnly })
+            Spacer(Modifier.height(4.dp))
             AdminPillButton("найти", { viewModel.loadDevices(query, activeOnly) }, Modifier.fillMaxWidth())
         } }
         when (val response = state.devices) {
             is LoadState.Ready -> {
-                item { AdminText("аккаунтов: ${response.value.logins} · устройств: ${response.value.totalDevices}", color = AdminTheme.colors.textMuted, fontSize = 10.sp) }
+                item { AdminText("аккаунтов: ${response.value.logins} · устройств: ${response.value.totalDevices}", color = AdminTheme.colors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 4.dp)) }
                 if (response.value.devices.isEmpty()) item { AdminCard { AdminText("устройства не найдены", color = AdminTheme.colors.textMuted) } }
-                items(response.value.devices, key = { it.login }) { group ->
-                    AdminCard(Modifier.clickable { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
+                itemsIndexed(response.value.devices, key = { _, it -> it.login }) { itemIndex, group -> AnimatedListItem(itemIndex) {
+                    AdminCard(onClick = { expanded = if (group.login in expanded) expanded - group.login else expanded + group.login }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) { AdminText("@${group.login}", fontWeight = FontWeight.Bold); AdminText("устройств: ${group.count}", color = AdminTheme.colors.textMuted, fontSize = 10.sp) }
                             AdminText(if (group.login in expanded) "⌃" else "⌄", color = AdminTheme.colors.accent, fontSize = 16.sp)
@@ -271,7 +300,7 @@ fun DevicesV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
                             }
                         }
                     }
-                }
+                } }
             }
             is LoadState.Error -> item { AdminCard { AdminText(response.message, color = AdminTheme.colors.error) } }
             else -> item { AdminSpinner("загрузка устройств") }
@@ -307,12 +336,12 @@ private fun TestPushDialogV3(device: AdminDevice, onDismiss: () -> Unit, onSend:
     }
 }
 
-private enum class OperationsTab(val label: String) { Maintenance("техработы"), Releases("релизы"), Audit("аудит"), Errors("ошибки"), Security("защита") }
+private enum class OperationsTab(val label: String) { Maintenance("техработы"), Releases("релизы"), Audit("аудит"), Errors("ошибки"), Security("защита"), Glass("стекло") }
 
 @Composable
 fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
     var tab by rememberSaveable { mutableStateOf(OperationsTab.Maintenance) }
-    Column(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().padding(top = adminTopChromeInset())) {
         Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AdminPageTitle("операции", "серверное управление и защита админки")
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -325,6 +354,7 @@ fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
             OperationsTab.Audit -> AuditPanelV3(state, viewModel)
             OperationsTab.Errors -> ErrorsPanelV3(state, viewModel)
             OperationsTab.Security -> SecurityPanelV3(state, viewModel)
+            OperationsTab.Glass -> GlassPanelV3()
         }
     }
 }
@@ -332,7 +362,7 @@ fun OperationsV3Screen(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var starts by rememberSaveable { mutableStateOf("") }; var ends by rememberSaveable { mutableStateOf("") }; var message by rememberSaveable { mutableStateOf("") }; var confirm by rememberSaveable { mutableStateOf<String?>(null) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         when (val maintenance = state.maintenance) {
             is LoadState.Ready -> AdminCard {
                 AdminSectionLabel("текущее состояние"); AdminKeyValue("сейчас", maintenance.value.maintenanceNow.ifBlank { "выключено" })
@@ -344,8 +374,13 @@ private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
         }
         AdminCard {
             AdminSectionLabel("запланировать")
-            AdminText("Время ISO 8601: 2026-07-20T01:00:00Z", color = AdminTheme.colors.textMuted, fontSize = 10.sp)
-            AdminField(starts, { starts = it }, "Начало", "ISO 8601"); AdminField(ends, { ends = it }, "Окончание", "ISO 8601"); AdminField(message, { message = it }, "Сообщение", "Увидят пользователи", 3)
+            Spacer(Modifier.height(4.dp))
+            AdminText("Формат времени ISO 8601, например 2026-07-20T01:00:00Z", color = AdminTheme.colors.textMuted, fontSize = 10.sp)
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(starts, { starts = it }, "Начало", "ISO 8601"); AdminField(ends, { ends = it }, "Окончание", "ISO 8601"); AdminField(message, { message = it }, "Сообщение", "Увидят пользователи", 3)
+            }
+            Spacer(Modifier.height(12.dp))
             AdminPillButton("сохранить расписание", { viewModel.scheduleMaintenance(starts, ends, message) }, Modifier.fillMaxWidth(), enabled = state.busyAction == null && starts.isNotBlank() && ends.isNotBlank() && message.isNotBlank())
         }
     }
@@ -355,20 +390,25 @@ private fun MaintenancePanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var version by rememberSaveable { mutableStateOf("") }; var changelog by rememberSaveable { mutableStateOf("") }; var url by rememberSaveable { mutableStateOf("") }; var sha by rememberSaveable { mutableStateOf("") }; var mandatory by rememberSaveable { mutableStateOf(false) }; var rollout by rememberSaveable { mutableStateOf("100") }; var publish by rememberSaveable { mutableStateOf<String?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { AdminCard {
             AdminSectionLabel("добавить или обновить релиз")
-            AdminField(version, { version = it }, "Версия", "x.y.z"); AdminField(changelog, { changelog = it }, "Что нового", "Необязательно", 4); AdminField(url, { url = it }, "URL", "Ссылка на APK"); AdminField(sha, { sha = it }, "SHA-256", "64 шестнадцатеричных символа")
-            AdminCheckRow("Обязательное обновление", mandatory, { mandatory = !mandatory }); AdminField(rollout, { rollout = it.filter(Char::isDigit).take(3) }, "Процент раздачи", "0–100", keyboardType = KeyboardType.Number)
+            Spacer(Modifier.height(10.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                AdminField(version, { version = it }, "Версия", "x.y.z"); AdminField(changelog, { changelog = it }, "Что нового", "Необязательно", 4); AdminField(url, { url = it }, "URL", "Ссылка на APK"); AdminField(sha, { sha = it }, "SHA-256", "64 шестнадцатеричных символа")
+            }
+            AdminCheckRow("Обязательное обновление", mandatory, { mandatory = !mandatory })
+            AdminField(rollout, { rollout = it.filter(Char::isDigit).take(3) }, "Процент раздачи", "0–100", keyboardType = KeyboardType.Number)
+            Spacer(Modifier.height(12.dp))
             AdminPillButton("сохранить релиз", { viewModel.saveRelease(ReleaseRecord(version.trim(), changelog.trim(), url.trim(), sha.trim(), mandatory, rollout.toIntOrNull()?.coerceIn(0,100) ?: 100)) }, Modifier.fillMaxWidth(), enabled = state.busyAction == null && version.isNotBlank())
         } }
         when (val releases = state.releases) {
-            is LoadState.Ready -> if (releases.value.items.isEmpty()) item { AdminCard { AdminText("релизов пока нет", color = AdminTheme.colors.textMuted) } } else items(releases.value.items, key = { it.version }) { release -> AdminCard {
+            is LoadState.Ready -> if (releases.value.items.isEmpty()) item { AdminCard { AdminText("релизов пока нет", color = AdminTheme.colors.textMuted) } } else itemsIndexed(releases.value.items, key = { _, it -> it.version }) { itemIndex, release -> AnimatedListItem(itemIndex) { AdminCard {
                 Row { AdminText(release.version, color = AdminTheme.colors.accent, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); if (release.mandatory) AdminChip("обязательный", destructive = true) }
                 if (release.changelog.isNotBlank()) AdminText(release.changelog, maxLines = 4, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 AdminKeyValue("раздача", "${release.rollout}%"); AdminKeyValue("опубликован", displayDate(release.publishedAt).ifBlank { "нет" })
                 AdminPillButton("опубликовать атомарно", { publish = release.version }, enabled = state.busyAction == null)
-            } }
+            } } }
             is LoadState.Error -> item { AdminCard { AdminText(releases.message, color = AdminTheme.colors.error) } }
             else -> item { AdminSpinner("загрузка релизов") }
         }
@@ -379,13 +419,13 @@ private fun ReleasesPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun AuditPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     when (val audit = state.audit) {
-        is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             item { AdminPillButton("обновить", viewModel::loadAudit) }
             if (audit.value.items.isEmpty()) item { AdminCard { AdminText("журнал пуст", color = AdminTheme.colors.textMuted) } }
-            items(audit.value.items, key = { it.id }) { record -> AdminCard {
+            itemsIndexed(audit.value.items, key = { _, it -> it.id }) { itemIndex, record -> AnimatedListItem(itemIndex) { AdminCard {
                 Row { AdminText(record.action, color = AdminTheme.colors.accent, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminChip(record.result, selected = record.result.equals("ok", true), destructive = !record.result.equals("ok", true)) }
                 AdminKeyValue("время", displayDate(record.at)); AdminKeyValue("IP", record.ip); if (record.meta.isNotBlank() && record.meta != "{}") AdminText(record.meta, color = AdminTheme.colors.textMuted, fontSize = 10.sp)
-            } }
+            } } }
         }
         is LoadState.Error -> AdminStatePanel(audit.message, true, viewModel::loadAudit)
         else -> AdminStatePanel("загрузка аудита")
@@ -398,9 +438,9 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("" to "все", "push" to "пуши", "github" to "GitHub", "database" to "база").forEach { (value,label) -> AdminChip(label, service == value) { service = value; viewModel.loadErrors(value) } } }
         when (val errors = state.errors) {
-            is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            is LoadState.Ready -> LazyColumn(Modifier.fillMaxSize(), contentPadding = adminPanelPadding(), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 if (errors.value.isEmpty()) item { AdminCard { AdminText("серверных ошибок нет", color = AdminTheme.colors.accent) } }
-                items(errors.value, key = { it.id }) { error -> AdminCard { Row { AdminText(error.code, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminText("×${error.count}") }; AdminText(error.message); AdminKeyValue("сервис", error.service); AdminKeyValue("последняя", displayDate(error.lastAt)) } }
+                itemsIndexed(errors.value, key = { _, it -> it.id }) { itemIndex, error -> AnimatedListItem(itemIndex) { AdminCard { Row { AdminText(error.code, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f)); AdminText("×${error.count}") }; AdminText(error.message); AdminKeyValue("сервис", error.service); AdminKeyValue("последняя", displayDate(error.lastAt)) } } }
             }
             is LoadState.Error -> AdminStatePanel(errors.message, true) { viewModel.loadErrors(service) }
             else -> AdminStatePanel("загрузка ошибок")
@@ -411,7 +451,7 @@ private fun ErrorsPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
 @Composable
 private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     var logoutConfirm by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(11.dp)) {
         AdminCard {
             AdminSectionLabel("защита экрана")
             AdminKeyValue("скриншоты", "разрешены")
@@ -432,6 +472,119 @@ private fun SecurityPanelV3(state: AdminUiState, viewModel: AdminViewModel) {
     if (logoutConfirm) TypedConfirmationDialog("удалить сохранённый ключ", "Для следующего входа потребуется полный X-Admin-Key.", "ВЫЙТИ", { logoutConfirm = false; viewModel.logout() }, { logoutConfirm = false })
 }
 
+// ═══ Настройка стекла: все параметры backdrop + выбор обоев ═══
+
+@Composable
+private fun GlassPanelV3() {
+    // Аккордеон: одна открытая группа за раз — короче экран и меньше
+    // одновременно живого стекла (свёрнутые слайдеры не в композиции).
+    var open by rememberSaveable { mutableStateOf("Обои") }
+    fun toggle(name: String) { open = if (open == name) "" else name }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(adminPanelPadding()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        AdminExpandableSection("Обои", open == "Обои", { toggle("Обои") }) {
+            Spacer(Modifier.height(4.dp))
+            WallpaperPickerRow()
+        }
+        AdminExpandableSection("Панели", open == "Панели", { toggle("Панели") }) {
+            GlassSlider("радиус углов", "%.0f dp", 8f..48f, { GlassSettingsStore.state.value.cardCornerRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardCornerRadius = it)) }
+            GlassSlider("размытие", "%.0f dp", 0f..32f, { GlassSettingsStore.state.value.cardBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardBlur = it)) }
+            GlassSlider("плотность заливки", "%.2f", 0f..0.8f, { GlassSettingsStore.state.value.cardSurfaceAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(cardSurfaceAlpha = it)) }
+            GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.refractionHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionHeight = it)) }
+            GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.refractionAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(refractionAmount = it)) }
+            GlassSlider("яркость", "%.2f", -0.5f..0.5f, { GlassSettingsStore.state.value.brightness }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(brightness = it)) }
+            GlassSlider("контраст", "%.2f", 0.5f..1.5f, { GlassSettingsStore.state.value.contrast }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(contrast = it)) }
+            GlassSlider("насыщенность", "%.2f", 0f..2f, { GlassSettingsStore.state.value.saturation }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(saturation = it)) }
+            GlassSlider("блик: ширина", "%.1f dp", 0f..6f, { GlassSettingsStore.state.value.highlightWidth }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(highlightWidth = it)) }
+            GlassSlider("блик: размытие", "%.1f dp", 0f..12f, { GlassSettingsStore.state.value.highlightBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(highlightBlur = it)) }
+            GlassSlider("блик: яркость", "%.2f", 0f..1f, { GlassSettingsStore.state.value.highlightAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(highlightAlpha = it)) }
+            GlassSlider("оттенок стекла", "%.0f°", 0f..360f, { GlassSettingsStore.state.value.tintHue }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintHue = it)) }
+            GlassSlider("цветность стекла", "%.2f", 0f..0.6f, { GlassSettingsStore.state.value.tintChroma }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintChroma = it)) }
+            GlassToggleRow("Глубина линзы", { it.depthEffect }) { g, v -> g.copy(depthEffect = v) }
+            GlassToggleRow("Хроматическая аберрация", { it.chromaticAberration }) { g, v -> g.copy(chromaticAberration = v) }
+            GlassToggleRow("Вибранс", { it.vibrancy }) { g, v -> g.copy(vibrancy = v) }
+        }
+        AdminExpandableSection("Контролы", open == "Контролы", { toggle("Контролы") }) {
+            GlassSlider("плотность цвета", "%.2f", 0.2f..1f, { GlassSettingsStore.state.value.tintAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(tintAlpha = it)) }
+            GlassSlider("линза: высота", "%.0f dp", 0f..48f, { GlassSettingsStore.state.value.controlLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlLensHeight = it)) }
+            GlassSlider("линза: сила", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.controlLensAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlLensAmount = it)) }
+            GlassSlider("размытие", "%.0f dp", 0f..16f, { GlassSettingsStore.state.value.controlBlur }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlBlur = it)) }
+            GlassSlider("внешняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadow = it)) }
+            GlassSlider("тень: радиус", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.controlShadowRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlShadowRadius = it)) }
+            GlassSlider("внутренняя тень", "%.2f", 0f..1f, { GlassSettingsStore.state.value.controlInnerShadow }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerShadow = it)) }
+            GlassSlider("вн. тень: радиус", "%.0f dp", 0f..16f, { GlassSettingsStore.state.value.controlInnerRadius }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlInnerRadius = it)) }
+            GlassSlider("окантовка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.controlStroke }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(controlStroke = it)) }
+        }
+        AdminExpandableSection("Цвет акцента", open == "Цвет акцента", { toggle("Цвет акцента") }) {
+            Spacer(Modifier.height(6.dp))
+            AccentColorWheel(
+                color = Color(GlassSettingsStore.state.value.accentColor),
+                onColorChange = { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(accentColor = it.toArgb())) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        AdminExpandableSection("Нижний бар", open == "Нижний бар", { toggle("Нижний бар") }) {
+            GlassSlider("высота линзы", "%.0f dp", 0f..64f, { GlassSettingsStore.state.value.barLensHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensHeight = it)) }
+            GlassSlider("сила линзы", "%.0f dp", 0f..96f, { GlassSettingsStore.state.value.barLensAmount }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barLensAmount = it)) }
+            GlassSlider("тонировка", "%.2f", 0f..0.5f, { GlassSettingsStore.state.value.barSurfaceAlpha }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(barSurfaceAlpha = it)) }
+        }
+        AdminExpandableSection("Кромки и фон", open == "Кромки и фон", { toggle("Кромки и фон") }) {
+            GlassSlider("затемнение обоев", "%.2f", 0f..0.6f, { GlassSettingsStore.state.value.wallpaperScrim }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaperScrim = it)) }
+            GlassSlider("блюр кромки сверху", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.edgeBlurTop }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeBlurTop = it)) }
+            GlassSlider("блюр кромки снизу", "%.0f dp", 0f..24f, { GlassSettingsStore.state.value.edgeBlurBottom }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeBlurBottom = it)) }
+            GlassSlider("высота фейда", "%.0f dp", 16f..64f, { GlassSettingsStore.state.value.edgeFadeHeight }) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(edgeFadeHeight = it)) }
+        }
+        AdminPillButton("сбросить настройки стекла", { GlassSettingsStore.reset() }, Modifier.fillMaxWidth(), accent = false)
+    }
+}
+
+@Composable
+private fun WallpaperPickerRow() {
+    // Отдельный composable: подписка на настройки не рекомпозит всю панель.
+    val selectedIndex = GlassSettingsStore.state.value.wallpaper
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        AdminWallpapers.items.forEachIndexed { index, res ->
+            val selected = selectedIndex == index
+            Image(
+                painterResource(res),
+                contentDescription = "обои ${index + 1}",
+                modifier = Modifier
+                    .size(72.dp, 126.dp)
+                    .clip(RoundedRectangle(16.dp))
+                    .border(
+                        if (selected) 2.dp else 1.dp,
+                        if (selected) AdminTheme.colors.accent else Color.White.copy(alpha = 0.2f),
+                        RoundedRectangle(16.dp),
+                    )
+                    .liquidClickable(pressedScale = LiquidMotion.PressCard) { GlassSettingsStore.update(GlassSettingsStore.state.value.copy(wallpaper = index)) },
+                contentScale = ContentScale.Crop,
+            )
+        }
+    }
+}
+
+@Composable
+private fun GlassToggleRow(label: String, get: (GlassSettings) -> Boolean, set: (GlassSettings, Boolean) -> GlassSettings) {
+    val checked = get(GlassSettingsStore.state.value)
+    AdminCheckRow(label, checked, { GlassSettingsStore.update(set(GlassSettingsStore.state.value, !checked)) })
+}
+
+@Composable
+private fun GlassSlider(label: String, format: String, range: ClosedFloatingPointRange<Float>, value: () -> Float, onChange: (Float) -> Unit) {
+    Column(Modifier.padding(vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            AdminText(label, color = AdminTheme.colors.textSecondary, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            AdminText(format.format(value()), fontSize = 12.sp)
+        }
+        LiquidSlider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = range,
+            visibilityThreshold = 0.001f,
+            backdrop = LocalLiquidBackdrop.current,
+        )
+    }
+}
+
 @Composable
 private fun TypedConfirmationDialog(title: String, description: String, required: String, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     var entered by rememberSaveable { mutableStateOf("") }
@@ -442,11 +595,11 @@ private fun TypedConfirmationDialog(title: String, description: String, required
 
 @Composable
 private fun AdminField(value: String, onChange: (String) -> Unit, label: String, help: String, minLines: Int = 1, keyboardType: KeyboardType = KeyboardType.Text) {
-    AdminTextField(value, onChange, label = label, placeholder = help, minLines = minLines, maxLines = if (minLines == 1) 1 else 10, keyboardOptions = KeyboardOptions(keyboardType = keyboardType)); Spacer(Modifier.height(3.dp)); AdminText(help, color = AdminTheme.colors.textMuted, fontSize = 9.sp)
+    AdminTextField(value, onChange, label = label, placeholder = help, minLines = minLines, maxLines = if (minLines == 1) 1 else 10, keyboardOptions = KeyboardOptions(keyboardType = keyboardType))
 }
 
 @Composable
-private fun AdminMetricCard(label: String, value: String, modifier: Modifier = Modifier) { AdminCard(modifier) { AdminText(label, color = AdminTheme.colors.textMuted, fontSize = 9.sp); AdminText(value, color = AdminTheme.colors.accent, fontSize = 26.sp, fontWeight = FontWeight.Bold) } }
+private fun AdminMetricCard(label: String, value: String, modifier: Modifier = Modifier) { AdminCard(modifier) { AdminText(label, color = AdminTheme.colors.textSecondary, fontSize = 10.sp, fontWeight = FontWeight.Medium); Spacer(Modifier.height(2.dp)); AdminText(value, color = AdminTheme.colors.accent, fontSize = 24.sp, fontWeight = FontWeight.Bold) } }
 
 @Composable
 private fun AdminStatePanel(message: String, error: Boolean = false, retry: (() -> Unit)? = null) { Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) { AdminCard(Modifier.widthIn(max = 440.dp)) { if (error) AdminText("! $message", color = AdminTheme.colors.error) else AdminSpinner(message); if (retry != null) { Spacer(Modifier.height(9.dp)); AdminPillButton("повторить", retry) } } } }

@@ -17,10 +17,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import org.gsgit.admin.R
+import org.gsgit.admin.data.GlassSettingsStore
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -32,6 +34,16 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
  * of this captured background. Never move [content] inside [LiquidSceneBackground].
  */
 val LocalLiquidBackdrop = compositionLocalOf<Backdrop> {
+    error("Liquid Glass component used outside LiquidScene")
+}
+
+/**
+ * Слой сцены (обои) — никогда не переопределяется карточками. Нажимные
+ * контролы преломляют его напрямую, чтобы выглядеть как мини-панели даже
+ * внутри карточек: слой карточки под ними однотонный, и линза на нём
+ * "не видна".
+ */
+val LocalLiquidSceneBackdrop = compositionLocalOf<Backdrop> {
     error("Liquid Glass component used outside LiquidScene")
 }
 
@@ -52,24 +64,28 @@ val LocalLiquidOverlay = compositionLocalOf<LiquidOverlayState> {
 }
 
 @Composable
-fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
+fun LiquidScene(
+    wallpaperRes: Int = R.drawable.admin_wallpaper,
+    content: @Composable BoxScope.() -> Unit,
+) {
     val backdrop = rememberLayerBackdrop()
     val overlayState = remember { LiquidOverlayState() }
 
     androidx.compose.runtime.CompositionLocalProvider(
         LocalLiquidBackdrop provides backdrop,
+        LocalLiquidSceneBackdrop provides backdrop,
         LocalLiquidOverlay provides overlayState,
     ) {
-        Box(Modifier.fillMaxSize().background(Color(0xFFE7F7FA))) {
+        Box(Modifier.fillMaxSize().background(Color(0xFF0E0508))) {
             // Source and consumers are siblings. This ordering is intentional and mandatory.
-            LiquidSceneBackground(Modifier.fillMaxSize().layerBackdrop(backdrop))
+            LiquidSceneBackground(wallpaperRes, Modifier.fillMaxSize().layerBackdrop(backdrop))
             content()
             overlayState.entry?.let { entry ->
                 BackHandler(enabled = entry.dismissOnBack, onBack = entry.onDismiss)
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(Color(0x3B29293A))
+                        .background(Color(0x8F121212))
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
@@ -84,13 +100,23 @@ fun LiquidScene(content: @Composable BoxScope.() -> Unit) {
 }
 
 @Composable
-private fun LiquidSceneBackground(modifier: Modifier = Modifier) {
-    Image(
-        painter = painterResource(R.drawable.kyant_wallpaper_light),
-        contentDescription = null,
-        modifier = modifier,
-        contentScale = ContentScale.Crop,
-    )
+private fun LiquidSceneBackground(wallpaperRes: Int, modifier: Modifier = Modifier) {
+    Box(modifier) {
+        Image(
+            painter = painterResource(wallpaperRes),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop,
+        )
+        // Настраиваемый скрим обоев (читается в draw-фазе — без рекомпозиций).
+        // Внутри слоя-источника: и контент, и стекло видят затемнённые обои.
+        Box(
+            Modifier.fillMaxSize().drawBehind {
+                val scrim = GlassSettingsStore.state.value.wallpaperScrim
+                if (scrim > 0f) drawRect(Color.Black, alpha = scrim.coerceIn(0f, 1f))
+            },
+        )
+    }
 }
 
 @Composable

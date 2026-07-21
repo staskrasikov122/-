@@ -12,10 +12,29 @@
 - лицензия: Apache License 2.0.
 
 С сохранением исходной реализации перенесены `LiquidButton`, `LiquidToggle`,
-`LiquidBottomTabs`, `LiquidBottomTab`, `InteractiveHighlight`,
+`LiquidBottomTabs`, `LiquidBottomTab`, `LiquidSlider`, `InteractiveHighlight`,
 `DampedDragAnimation`, `DragGestureInspector` и Android-обёртка `awaitFrame`.
-Изменены только namespace/import для обычного Android-модуля.
-В качестве фонового изображения интерфейса также используется
-`wallpaper_light.webp` из того же зафиксированного снимка проекта.
+Изменены namespace/import для обычного Android-модуля, а также смягчены
+константы анимаций (жёсткость пружин в `DampedDragAnimation`, масштаб нажатия
+в `LiquidToggle`). `GlassBottomTabBar` перенесён из проекта GlassFiles автора
+приложения и построен на тех же компонентах Backdrop.
 
 Copyright Kyant0. Licensed under the Apache License, Version 2.0.
+
+## Inter
+
+Шрифт интерфейса — Inter:
+
+- автор: Rasmus Andersson;
+- репозиторий: https://github.com/rsms/inter;
+- статические начертания (Regular/Medium/SemiBold/Bold) инстанцированы из
+  вариативного шрифта, распространяемого через Google Fonts;
+- лицензия: SIL Open Font License 1.1.
+
+## Material Icons
+
+Векторные иконки навигации и панелей (`AdminIcons`) — path-данные из
+Material Icons (Round):
+
+- проект: https://github.com/google/material-design-icons;
+- лицензия: Apache License 2.0.

@@ -21,9 +21,14 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import org.gsgit.admin.data.GlassSettingsStore
 import org.gsgit.admin.ui.liquid.LiquidScene
+import org.gsgit.admin.ui.liquid.LocalLiquidBackdrop
 import org.gsgit.admin.ui.theme.AdminTheme
 
 @Composable
@@ -52,7 +57,10 @@ fun AdminApp(viewModel: AdminViewModel) {
         }
     }
 
-    LiquidScene {
+    // derivedStateOf: рекомпозиция только при смене ОБОЕВ, а не любого
+    // параметра стекла (те читаются в draw-фазе и сюда не долетают).
+    val wallpaper by remember { derivedStateOf { GlassSettingsStore.state.value.wallpaper } }
+    LiquidScene(wallpaperRes = AdminWallpapers.resFor(wallpaper)) {
         when (val auth = state.auth) {
             AuthState.Restoring -> CenterStatus("восстановление защищённой сессии")
             is AuthState.Locked -> AdminKeyScreen(auth.error, false, viewModel::unlock)
@@ -68,7 +76,7 @@ fun AdminApp(viewModel: AdminViewModel) {
         toast?.let { message ->
             AdminToast(
                 message,
-                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 94.dp),
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp, vertical = 104.dp),
             )
         }
     }
@@ -79,7 +87,7 @@ private fun AdminKeyScreen(error: String?, checking: Boolean, onUnlock: (String)
     var key by rememberSaveable { mutableStateOf("") }
     Box(Modifier.fillMaxSize().safeDrawingPadding().padding(22.dp), contentAlignment = Alignment.Center) {
         AdminCard(Modifier.widthIn(max = 460.dp), elevated = true) {
-            AdminText("[ Админ GsGit ]", color = AdminTheme.colors.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            AdminText("Админ GsGit", color = AdminTheme.colors.accent, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(7.dp))
             AdminText("панель управления заблокирована", color = AdminTheme.colors.textMuted, fontSize = 11.sp)
             Spacer(Modifier.height(16.dp))
@@ -158,7 +166,7 @@ private fun BiometricScreen(
 
     Box(Modifier.fillMaxSize().safeDrawingPadding().padding(22.dp), contentAlignment = Alignment.Center) {
         AdminCard(Modifier.widthIn(max = 460.dp), elevated = true) {
-            AdminText("> защищённый вход", fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            AdminText("Защищённый вход", fontSize = 19.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             AdminText("Сохранённый ключ остаётся зашифрованным. Подтвердите личность системным способом.", color = AdminTheme.colors.textSecondary, fontSize = 11.sp)
             if (!error.isNullOrBlank()) {
@@ -180,19 +188,27 @@ private fun biometricError(context: Context, code: Int): String = when (code) {
     else -> "Системная аутентификация недоступна ($code)"
 }
 
+// Четыре вкладки в нижнем баре; «операции» открываются шестерёнкой в верхней панели.
 private val adminNavigation = listOf(
-    AdminNavItem(Section.Dashboard, "обзор", "◉"),
-    AdminNavItem(Section.AppConfig, "конфиг", "⌁"),
-    AdminNavItem(Section.Announce, "пуши", "⌁"),
-    AdminNavItem(Section.Devices, "устройства", "◇"),
-    AdminNavItem(Section.Operations, "операции", "⚙"),
+    AdminNavItem(Section.Dashboard, "обзор", AdminIcons.Dashboard),
+    AdminNavItem(Section.AppConfig, "конфиг", AdminIcons.Tune),
+    AdminNavItem(Section.Announce, "пуши", AdminIcons.Notifications),
+    AdminNavItem(Section.Devices, "устройства", AdminIcons.Devices),
 )
 
 @Composable
 private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
-    Column(Modifier.fillMaxSize()) {
-        AdminTopBar(viewModel::refreshAll, viewModel::lock, state.backend, viewModel::selectBackend)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
+    val sceneBackdrop = LocalLiquidBackdrop.current
+    val contentLayer = rememberLayerBackdrop()
+    // Хром (бар и кромки) преломляет и размывает не только обои, но и
+    // проезжающий под ним контент: сцена + слой контента. Настройки стекла
+    // при этом читаются в draw-фазе, так что рекомпозиций на кадр нет.
+    val chromeBackdrop = rememberCombinedBackdrop(sceneBackdrop, contentLayer)
+    Box(Modifier.fillMaxSize()) {
+        // Контент во весь экран: списки проезжают под шапкой и баром
+        // (adminScreenPadding даёт им вставки). Слой контента — источник
+        // для хрома; его консюмеры ниже — сиблинги, не вложены.
+        Box(Modifier.fillMaxSize().layerBackdrop(contentLayer)) {
             if (state.backend == Backend.GlassFiles) {
                 GlassFilesPlaceholderV3()
             } else {
@@ -205,7 +221,23 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
                 }
             }
         }
-        if (state.backend == Backend.GsGit) AdminBottomBar(adminNavigation, state.section, viewModel::selectSection)
+        CompositionLocalProvider(LocalLiquidBackdrop provides chromeBackdrop) {
+            AdminEdgeBlur(topEdge = true, Modifier.align(Alignment.TopCenter))
+            if (state.backend == Backend.GsGit) {
+                AdminEdgeBlur(topEdge = false, Modifier.align(Alignment.BottomCenter))
+            }
+            AdminTopBar(
+                onRefresh = viewModel::refreshAll,
+                onLock = viewModel::lock,
+                onOperations = { viewModel.selectSection(Section.Operations) },
+                operationsActive = state.section == Section.Operations,
+                backend = state.backend,
+                onBackend = viewModel::selectBackend,
+            )
+            if (state.backend == Backend.GsGit) {
+                AdminBottomBar(adminNavigation, state.section, viewModel::selectSection, Modifier.align(Alignment.BottomCenter))
+            }
+        }
     }
 }
 
@@ -213,7 +245,7 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
 private fun GlassFilesPlaceholderV3() {
     Box(Modifier.fillMaxSize().padding(20.dp), contentAlignment = Alignment.Center) {
         AdminCard(Modifier.widthIn(max = 520.dp)) {
-            AdminText("[ GlassFiles ]", color = AdminTheme.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            AdminText("GlassFiles", color = AdminTheme.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             AdminText("Контракт API пока не подключён. Вымышленные запросы не выполняются.", color = AdminTheme.colors.textMuted)
         }
