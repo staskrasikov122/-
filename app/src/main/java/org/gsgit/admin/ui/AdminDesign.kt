@@ -855,8 +855,8 @@ fun AdminTopBar(
                 AdminText("Админ сервера", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 AdminText("api.gsgit.org", color = colors.textMuted, fontSize = 11.sp, maxLines = 1)
             }
-            AdminIconAction(AdminIcons.Refresh, "обновить", onRefresh, enabled = backend == Backend.GsGit)
-            AdminIconAction(AdminIcons.Settings, "операции", onOperations, active = operationsActive)
+            AdminIconAction(AdminIcons.Refresh, "обновить", onRefresh, enabled = backend != Backend.GlassFiles)
+            AdminIconAction(AdminIcons.Settings, "операции", onOperations, enabled = backend == Backend.GsGit, active = operationsActive)
             AdminIconAction(AdminIcons.Lock, "заблокировать", onLock)
         }
         Spacer(Modifier.height(10.dp))

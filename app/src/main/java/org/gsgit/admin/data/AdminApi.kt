@@ -1,15 +1,9 @@
 package org.gsgit.admin.data
 
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import java.io.IOException
-import java.net.SocketTimeoutException
-import java.net.URL
 import java.net.URLEncoder
-import javax.net.ssl.HttpsURLConnection
 
 class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
     suspend fun getStats(key: String): AdminStats = parseObject(request("GET", "/admin/stats", key)) { json ->
@@ -288,54 +282,7 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
     }
 
     private suspend fun request(method: String, path: String, key: String?, body: JSONObject? = null): String =
-        withContext(Dispatchers.IO) {
-            val connection = (URL(baseUrl + path).openConnection() as HttpsURLConnection).apply {
-                requestMethod = method
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                setRequestProperty("Accept", "application/json")
-                if (key != null) setRequestProperty("X-Admin-Key", key)
-                if (body != null) {
-                    doOutput = true
-                    setRequestProperty("Content-Type", "application/json; charset=utf-8")
-                }
-            }
-            try {
-                if (body != null) connection.outputStream.bufferedWriter(Charsets.UTF_8).use { it.write(body.toString()) }
-                val status = connection.responseCode
-                val response = (if (status in 200..299) connection.inputStream else connection.errorStream)
-                    ?.bufferedReader(Charsets.UTF_8)?.use { it.readText() }.orEmpty()
-                when (status) {
-                    in 200..299 -> response
-                    400 -> throw ApiFailure.BadRequest(readError(response) ?: "Некорректный запрос")
-                    401 -> throw ApiFailure.Unauthorized()
-                    404 -> throw ApiFailure.NotFound(readError(response) ?: "Объект не найден")
-                    409 -> throw ApiFailure.Conflict(readError(response) ?: "Операция недоступна")
-                    502 -> throw ApiFailure.Upstream(readError(response) ?: "Внешний сервис отклонил запрос")
-                    else -> throw ApiFailure.Server(status)
-                }
-            } catch (failure: ApiFailure) {
-                throw failure
-            } catch (_: SocketTimeoutException) {
-                throw ApiFailure.Unreachable()
-            } catch (_: IOException) {
-                throw ApiFailure.Unreachable()
-            } finally {
-                connection.disconnect()
-            }
-        }
-
-    private fun readError(raw: String): String? = try {
-        when (val error = JSONObject(raw).optString("error").takeIf { it.isNotBlank() }) {
-            "bad json" -> "Некорректные данные запроса"
-            "title and body required" -> "Заголовок и текст обязательны"
-            "bad admin key" -> "Неверный ключ"
-            "not found" -> "Объект не найден"
-            else -> error
-        }
-    } catch (_: JSONException) {
-        null
-    }
+        AdminHttpClient.request(baseUrl, method, path, key, body)
 
     private inline fun <T> parseObject(raw: String, parser: (JSONObject) -> T): T = try {
         parser(JSONObject(raw))
@@ -385,8 +332,4 @@ class AdminApi(private val baseUrl: String = "https://api.gsgit.org") {
     private fun query(value: String) = segment(value)
     private fun cursorParam(cursor: String?) = cursor?.takeIf { it.isNotBlank() }?.let { "&cursor=${query(it)}" }.orEmpty()
 
-    private companion object {
-        const val CONNECT_TIMEOUT_MS = 10_000
-        const val READ_TIMEOUT_MS = 20_000
-    }
 }

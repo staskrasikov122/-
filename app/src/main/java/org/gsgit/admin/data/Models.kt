@@ -160,7 +160,7 @@ data class ServerErrorRecord(
 data class Page<T>(val items: List<T>, val nextCursor: String?)
 
 sealed class ApiFailure(message: String) : Exception(message) {
-    class Unauthorized : ApiFailure("Неверный ключ")
+    class Unauthorized : ApiFailure("Неверный admin-key")
     class BadRequest(message: String) : ApiFailure(message)
     class NotFound(message: String = "Объект не найден") : ApiFailure(message)
     class Conflict(message: String) : ApiFailure(message)

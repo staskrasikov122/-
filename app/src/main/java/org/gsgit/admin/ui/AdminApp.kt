@@ -209,16 +209,16 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
         // (adminScreenPadding даёт им вставки). Слой контента — источник
         // для хрома; его консюмеры ниже — сиблинги, не вложены.
         Box(Modifier.fillMaxSize().layerBackdrop(contentLayer)) {
-            if (state.backend == Backend.GlassFiles) {
-                GlassFilesPlaceholderV3()
-            } else {
-                when (state.section) {
-                    Section.Dashboard -> DashboardV3Screen(state, viewModel)
-                    Section.AppConfig -> AppConfigV3Screen(state, viewModel)
-                    Section.Announce -> AnnounceV3Screen(state, viewModel)
-                    Section.Devices -> DevicesV3Screen(state, viewModel)
-                    Section.Operations -> OperationsV3Screen(state, viewModel)
-                }
+            when (state.backend) {
+                Backend.LMG -> LmgAdminScreen(state, viewModel)
+                Backend.GlassFiles -> GlassFilesPlaceholderV3()
+                Backend.GsGit -> when (state.section) {
+                        Section.Dashboard -> DashboardV3Screen(state, viewModel)
+                        Section.AppConfig -> AppConfigV3Screen(state, viewModel)
+                        Section.Announce -> AnnounceV3Screen(state, viewModel)
+                        Section.Devices -> DevicesV3Screen(state, viewModel)
+                        Section.Operations -> OperationsV3Screen(state, viewModel)
+                    }
             }
         }
         CompositionLocalProvider(LocalLiquidBackdrop provides chromeBackdrop) {
@@ -230,7 +230,7 @@ private fun AdminShell(state: AdminUiState, viewModel: AdminViewModel) {
                 onRefresh = viewModel::refreshAll,
                 onLock = viewModel::lock,
                 onOperations = { viewModel.selectSection(Section.Operations) },
-                operationsActive = state.section == Section.Operations,
+                operationsActive = state.backend == Backend.GsGit && state.section == Section.Operations,
                 backend = state.backend,
                 onBackend = viewModel::selectBackend,
             )

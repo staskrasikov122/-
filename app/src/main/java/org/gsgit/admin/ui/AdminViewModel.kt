@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.gsgit.admin.data.*
 
-enum class Backend { GsGit, GlassFiles }
+enum class Backend { GsGit, LMG, GlassFiles }
 enum class Section { Dashboard, AppConfig, Announce, Devices, Operations }
 
 sealed interface AuthState {
@@ -53,6 +53,15 @@ data class AdminUiState(
     val errors: LoadState<List<ServerErrorRecord>> = LoadState.Idle,
     val configRevisionDetails: LoadState<ConfigRevision> = LoadState.Idle,
     val releaseReadiness: LoadState<ReleaseReadiness> = LoadState.Idle,
+    val lmgHealth: LoadState<LmgHealth> = LoadState.Idle,
+    val lmgMetrics: LoadState<LmgMetrics> = LoadState.Idle,
+    val lmgMetricsPeriod: String = "24h",
+    val lmgUsers: LoadState<LmgUsersResponse> = LoadState.Idle,
+    val lmgSelectedUser: LoadState<LmgUser> = LoadState.Idle,
+    val lmgDevices: LoadState<LmgDevicesResponse> = LoadState.Idle,
+    val lmgConfig: LoadState<LmgConfig> = LoadState.Idle,
+    val lmgErrors: LoadState<List<LmgError>> = LoadState.Idle,
+    val lmgSessionTest: LoadState<LmgSessionTest> = LoadState.Idle,
     val savingConfig: Boolean = false,
     val sendingAnnouncement: Boolean = false,
     val togglingKillSwitch: Boolean = false,
@@ -68,6 +77,7 @@ data class AdminUiState(
 
 class AdminViewModel(application: Application) : AndroidViewModel(application) {
     private val api = AdminApi()
+    private val lmgApi = LmgAdminApi()
     private val keyStore = AdminKeyStore(application)
     private val securityStore = AdminSecurityStore(application)
     private val draftStore = AdminDraftStore(application)
@@ -227,7 +237,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(releaseDraft = ReleaseRecord("")) }
     }
 
-    fun selectBackend(backend: Backend) = _state.update { it.copy(backend = backend) }
+    fun selectBackend(backend: Backend) {
+        _state.update { it.copy(backend = backend) }
+        if (backend == Backend.LMG) loadLmgDashboard()
+        restartAutoRefresh()
+    }
 
     fun selectSection(section: Section) {
         _state.update { it.copy(section = section) }
@@ -252,6 +266,11 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun refreshAll() {
+        if (_state.value.backend == Backend.LMG) {
+            loadLmgDashboard()
+            return
+        }
+        if (_state.value.backend == Backend.GlassFiles) return
         when (_state.value.section) {
             Section.Dashboard -> loadDashboard()
             Section.AppConfig -> { loadConfig(); loadConfigHistory() }
@@ -274,6 +293,77 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         if (period !in setOf("1h", "24h", "7d", "30d")) return
         _state.update { it.copy(metricsPeriod = period) }
         loadInto({ copy(metrics = it) }) { api.getMetrics(requireKey(), period) }
+    }
+
+    fun loadLmgDashboard() {
+        loadLmgHealth()
+        loadLmgMetrics(_state.value.lmgMetricsPeriod)
+        loadLmgUsers()
+        loadLmgDevices()
+        loadLmgConfig()
+        loadLmgErrors()
+    }
+
+    fun loadLmgHealth() = loadInto({ copy(lmgHealth = it) }) { lmgApi.getHealth(requireKey()) }
+
+    fun loadLmgMetrics(period: String) {
+        if (period !in setOf("1h", "24h", "7d", "30d")) return
+        _state.update { it.copy(lmgMetricsPeriod = period) }
+        loadInto({ copy(lmgMetrics = it) }) { lmgApi.getMetrics(requireKey(), period) }
+    }
+
+    fun loadLmgUsers() = loadInto({ copy(lmgUsers = it) }) { lmgApi.getUsers(requireKey()) }
+    fun loadLmgDevices() = loadInto({ copy(lmgDevices = it) }) { lmgApi.getDevices(requireKey()) }
+    fun loadLmgConfig() = loadInto({ copy(lmgConfig = it) }) { lmgApi.getConfig(requireKey()) }
+    fun loadLmgErrors() = loadInto({ copy(lmgErrors = it) }) { lmgApi.getErrors(requireKey()) }
+
+    fun loadLmgUser(partnerUserId: String) =
+        loadInto({ copy(lmgSelectedUser = it) }) { lmgApi.getUser(requireKey(), partnerUserId) }
+
+    fun closeLmgUser() {
+        _state.update { it.copy(lmgSelectedUser = LoadState.Idle) }
+    }
+
+    fun setLmgPremium(partnerUserId: String, premium: Boolean, until: Long = 0) =
+        action("lmg.premium.$partnerUserId") {
+            val updated = lmgApi.setPremium(requireKey(), partnerUserId, premium, until)
+            _state.update { it.copy(lmgSelectedUser = LoadState.Ready(updated)) }
+            loadLmgUsers()
+            if (premium) "Ручной премиум выдан" else "Ручной премиум снят"
+        }
+
+    fun deleteLmgUser(partnerUserId: String) = action("lmg.user.delete.$partnerUserId") {
+        lmgApi.deleteUser(requireKey(), partnerUserId)
+        closeLmgUser()
+        loadLmgUsers()
+        loadLmgDevices()
+        loadLmgHealth()
+        "Пользователь удалён"
+    }
+
+    fun saveLmgConfig(previous: LmgConfig, updated: LmgConfig) = action("lmg.config.save") {
+        val saved = lmgApi.updateConfig(requireKey(), previous, updated)
+        _state.update { it.copy(lmgConfig = LoadState.Ready(saved)) }
+        if (saved == previous) "В конфигурации нет изменений" else "Конфигурация LMG сохранена"
+    }
+
+    fun testLmgSession() {
+        if (_state.value.busyAction != null) return
+        _state.update { it.copy(busyAction = "lmg.session.test", lmgSessionTest = LoadState.Loading) }
+        viewModelScope.launch {
+            try {
+                val result = lmgApi.testSession(requireKey())
+                _state.update { it.copy(lmgSessionTest = LoadState.Ready(result)) }
+                _messages.emit(if (result.gotToken) "Связь с ICM работает" else "ICM не вернул токен")
+            } catch (failure: ApiFailure) {
+                onRequestFailure(failure) { message ->
+                    _state.update { it.copy(lmgSessionTest = LoadState.Error(message)) }
+                    _messages.tryEmit(message)
+                }
+            } finally {
+                _state.update { it.copy(busyAction = null) }
+            }
+        }
     }
 
     fun loadDevices(login: String = "", activeOnly: Boolean = false) =
@@ -653,14 +743,14 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         if (failure is ApiFailure.Unauthorized) {
             sessionKey = null
             keyStore.clear()
-            _state.update { it.copy(auth = AuthState.Locked("Неверный ключ")) }
+            _state.update { it.copy(auth = AuthState.Locked("Неверный admin-key")) }
         } else {
             keepScreen(failure.userMessage())
         }
     }
 
     private fun ApiFailure.userMessage(): String = when (this) {
-        is ApiFailure.Unauthorized -> "Неверный ключ"
+        is ApiFailure.Unauthorized -> "Неверный admin-key"
         is ApiFailure.BadRequest -> message ?: "Некорректный запрос"
         is ApiFailure.NotFound -> message ?: "Объект не найден"
         is ApiFailure.Conflict -> message ?: "Операция недоступна"
