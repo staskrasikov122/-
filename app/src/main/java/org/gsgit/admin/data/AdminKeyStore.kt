@@ -16,9 +16,7 @@ class AdminKeyStore(private val context: Context) {
 
     fun read(): String? = preferences.getString(KEY_ADMIN, null)?.takeIf { it.isNotBlank() }
 
-    fun save(key: String) {
-        preferences.edit().putString(KEY_ADMIN, key).apply()
-    }
+    fun save(key: String): Boolean = preferences.edit().putString(KEY_ADMIN, key).commit()
 
     fun clear() {
         preferences.edit().remove(KEY_ADMIN).apply()

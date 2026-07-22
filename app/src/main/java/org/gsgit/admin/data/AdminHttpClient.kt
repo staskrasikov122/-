@@ -68,6 +68,46 @@ object AdminHttpClient {
         }
     }
 
+    suspend fun download(baseUrl: String, path: String, adminKey: String): LmgBackup = withContext(Dispatchers.IO) {
+        val url = "$baseUrl$path"
+        if (!url.startsWith("https://")) throw ApiFailure.BadRequest("Админ-API доступен только по HTTPS")
+        val request = Request.Builder()
+            .url(url)
+            .header("Accept", "application/json")
+            .header("x-admin-key", adminKey)
+            .get()
+            .build()
+        try {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    val raw = response.body?.string().orEmpty()
+                    when (response.code) {
+                        400 -> throw ApiFailure.BadRequest(readError(raw) ?: "Некорректный запрос")
+                        401 -> throw ApiFailure.Unauthorized()
+                        404 -> throw ApiFailure.NotFound(readError(raw) ?: "Объект не найден")
+                        else -> throw ApiFailure.Server(response.code)
+                    }
+                }
+                val disposition = response.header("Content-Disposition").orEmpty()
+                val remoteName = Regex("""filename="?([^";]+)""").find(disposition)?.groupValues?.getOrNull(1)
+                val fileName = remoteName
+                    ?.substringAfterLast('/')
+                    ?.substringAfterLast('\\')
+                    ?.takeIf { it.endsWith(".json", ignoreCase = true) }
+                    ?: "lmg-backup-${System.currentTimeMillis()}.json"
+                LmgBackup(fileName, response.body?.bytes() ?: throw ApiFailure.InvalidResponse())
+            }
+        } catch (failure: ApiFailure) {
+            throw failure
+        } catch (_: SocketTimeoutException) {
+            throw ApiFailure.Unreachable()
+        } catch (_: IOException) {
+            throw ApiFailure.Unreachable()
+        } catch (_: IllegalArgumentException) {
+            throw ApiFailure.InvalidResponse()
+        }
+    }
+
     private fun readError(raw: String): String? = try {
         when (val error = JSONObject(raw).optString("error").takeIf { it.isNotBlank() }) {
             "bad json" -> "Некорректные данные запроса"
