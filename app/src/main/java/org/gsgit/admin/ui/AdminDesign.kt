@@ -212,10 +212,11 @@ fun AdminCard(
     modifier: Modifier = Modifier,
     elevated: Boolean = false,
     onClick: (() -> Unit)? = null,
+    exportContentBackdrop: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val backdrop = LocalLiquidBackdrop.current
-    val contentBackdrop = rememberLayerBackdrop()
+    val contentBackdrop = if (exportContentBackdrop) rememberLayerBackdrop() else null
     // Пресс-сжатие кликабельной карточки — только через layerBlock:
     // внешний graphicsLayer ломает сэмплинг backdrop.
     var pressed by remember { mutableStateOf(false) }
@@ -282,7 +283,7 @@ fun AdminCard(
             )
             .padding(horizontal = if (elevated) 24.dp else 18.dp, vertical = if (elevated) 22.dp else 16.dp),
     ) {
-        CompositionLocalProvider(LocalLiquidBackdrop provides contentBackdrop) { content() }
+        CompositionLocalProvider(LocalLiquidBackdrop provides (contentBackdrop ?: backdrop)) { content() }
     }
 }
 
@@ -890,9 +891,10 @@ fun AdminExpandableSection(
     title: String,
     expanded: Boolean,
     onToggle: () -> Unit,
+    exportContentBackdrop: Boolean = true,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    AdminCard {
+    AdminCard(exportContentBackdrop = exportContentBackdrop) {
         Row(
             Modifier.fillMaxWidth().liquidClickable(pressedScale = LiquidMotion.PressCard, onClick = onToggle),
             verticalAlignment = Alignment.CenterVertically,
