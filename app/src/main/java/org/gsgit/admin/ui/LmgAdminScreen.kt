@@ -92,7 +92,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         item { AdminPageTitle("LMG", "управление сервером LiquidMusicGlass") }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Сводный статус")
                 Spacer(Modifier.height(8.dp))
                 when (val status = state.lmgStatus) {
@@ -126,7 +126,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Активность")
                 Spacer(Modifier.height(8.dp))
                 when (val activity = state.lmgActivity) {
@@ -161,7 +161,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Health")
                 Spacer(Modifier.height(8.dp))
                 when (val health = state.lmgHealth) {
@@ -192,7 +192,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Metrics")
                 Spacer(Modifier.height(8.dp))
                 AdminPillFlowRow(Modifier.fillMaxWidth()) {
@@ -224,7 +224,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Latency ICM")
                 Spacer(Modifier.height(8.dp))
                 when (val latency = state.lmgLatency) {
@@ -250,7 +250,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Users")
                 Spacer(Modifier.height(8.dp))
                 AdminTextField(
@@ -279,7 +279,10 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
             visibleUsers,
             key = { index, user -> user.partnerUserId.ifBlank { "lmg-user-$index" } },
         ) { _, user ->
-            AdminCard(onClick = { viewModel.loadLmgUser(user.partnerUserId) }) {
+            AdminCard(
+                onClick = { viewModel.loadLmgUser(user.partnerUserId) },
+                exportContentBackdrop = false,
+            ) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {
                             AdminText(user.name.ifBlank { "Без имени" }, fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -300,7 +303,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Devices")
                 Spacer(Modifier.height(8.dp))
                 when (val devices = state.lmgDevices) {
@@ -320,7 +323,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
 
         val devices = (state.lmgDevices as? LoadState.Ready)?.value?.items.orEmpty()
         itemsIndexed(devices, key = { index, device -> device.deviceId.ifBlank { "lmg-device-$index" } }) { _, device ->
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                     AdminText(device.name.ifBlank { "Без имени" }, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     AdminText(device.deviceId, color = AdminTheme.colors.textMuted, fontSize = 10.sp)
                     Spacer(Modifier.height(5.dp))
@@ -335,7 +338,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Config")
                 Spacer(Modifier.height(8.dp))
                 when (val config = state.lmgConfig) {
@@ -373,7 +376,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Errors")
                 Spacer(Modifier.height(8.dp))
                 when (val errors = state.lmgErrors) {
@@ -393,7 +396,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
 
         val errors = (state.lmgErrors as? LoadState.Ready)?.value.orEmpty()
         itemsIndexed(errors, key = { index, error -> "${error.code}-${error.lastAt}-$index" }) { _, error ->
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                     Row(Modifier.fillMaxWidth()) {
                         AdminText(error.code.ifBlank { "UNKNOWN" }, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         AdminText("×${error.count}", color = AdminTheme.colors.textSecondary)
@@ -406,7 +409,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Крэши клиентов")
                 Spacer(Modifier.height(8.dp))
                 when (val errors = state.lmgClientErrors) {
@@ -437,6 +440,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
                 title = "${error.level.ifBlank { "error" }} · ${error.tag.ifBlank { error.key }} ×${error.count}",
                 expanded = expandedClientError == itemKey,
                 onToggle = { expandedClientError = if (expandedClientError == itemKey) null else itemKey },
+                exportContentBackdrop = false,
             ) {
                 AdminText(error.message.ifBlank { "Без описания" })
                 Spacer(Modifier.height(6.dp))
@@ -454,7 +458,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Rate limits")
                 Spacer(Modifier.height(8.dp))
                 when (val limits = state.lmgRateLimits) {
@@ -480,7 +484,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
 
         val rateLimits = (state.lmgRateLimits as? LoadState.Ready)?.value.orEmpty()
         itemsIndexed(rateLimits, key = { index, limit -> limit.ip.ifBlank { "rate-limit-$index" } }) { _, limit ->
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                     AdminText(limit.ip.ifBlank { "неизвестный IP" }, fontWeight = FontWeight.Bold)
                     AdminKeyValue("запросов за минуту", limit.hitsLastMin.toString())
                     AdminTextAction("снять лимит", { viewModel.clearLmgRateLimits(limit.ip) }, destructive = true)
@@ -488,7 +492,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Обслуживание")
                 Spacer(Modifier.height(8.dp))
                 AdminText("Резервная копия содержит пользователей, конфигурацию и ошибки. Ключ в неё не добавляется.", color = AdminTheme.colors.textSecondary, fontSize = 11.sp)
@@ -516,7 +520,7 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         item {
-            AdminCard {
+            AdminCard(exportContentBackdrop = false) {
                 AdminSectionLabel("Session test")
                 Spacer(Modifier.height(8.dp))
                 when (val test = state.lmgSessionTest) {
