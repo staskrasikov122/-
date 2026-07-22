@@ -1,10 +1,12 @@
 package org.gsgit.admin.ui
 
 import android.app.Application
+import android.net.Uri
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -13,7 +15,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.gsgit.admin.data.*
+import java.io.IOException
 
 enum class Backend { GsGit, LMG, GlassFiles }
 enum class Section { Dashboard, AppConfig, Announce, Devices, Operations }
@@ -54,6 +58,9 @@ data class AdminUiState(
     val configRevisionDetails: LoadState<ConfigRevision> = LoadState.Idle,
     val releaseReadiness: LoadState<ReleaseReadiness> = LoadState.Idle,
     val lmgHealth: LoadState<LmgHealth> = LoadState.Idle,
+    val lmgStatus: LoadState<LmgStatus> = LoadState.Idle,
+    val lmgActivity: LoadState<LmgActivity> = LoadState.Idle,
+    val lmgLatency: LoadState<Map<String, LmgLatencyStat>> = LoadState.Idle,
     val lmgMetrics: LoadState<LmgMetrics> = LoadState.Idle,
     val lmgMetricsPeriod: String = "24h",
     val lmgUsers: LoadState<LmgUsersResponse> = LoadState.Idle,
@@ -62,6 +69,10 @@ data class AdminUiState(
     val lmgConfig: LoadState<LmgConfig> = LoadState.Idle,
     val lmgErrors: LoadState<List<LmgError>> = LoadState.Idle,
     val lmgSessionTest: LoadState<LmgSessionTest> = LoadState.Idle,
+    val lmgClientErrors: LoadState<List<LmgClientError>> = LoadState.Idle,
+    val lmgRateLimits: LoadState<List<LmgRateLimit>> = LoadState.Idle,
+    val lmgBackup: LoadState<LmgBackup> = LoadState.Idle,
+    val lmgRotatedKey: LoadState<LmgRotatedKey> = LoadState.Idle,
     val savingConfig: Boolean = false,
     val sendingAnnouncement: Boolean = false,
     val togglingKillSwitch: Boolean = false,
@@ -296,15 +307,23 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun loadLmgDashboard() {
+        loadLmgStatus()
         loadLmgHealth()
+        loadLmgActivity()
+        loadLmgLatency()
         loadLmgMetrics(_state.value.lmgMetricsPeriod)
         loadLmgUsers()
         loadLmgDevices()
         loadLmgConfig()
         loadLmgErrors()
+        loadLmgClientErrors()
+        loadLmgRateLimits()
     }
 
+    fun loadLmgStatus() = loadInto({ copy(lmgStatus = it) }) { lmgApi.getStatus(requireKey()) }
     fun loadLmgHealth() = loadInto({ copy(lmgHealth = it) }) { lmgApi.getHealth(requireKey()) }
+    fun loadLmgActivity() = loadInto({ copy(lmgActivity = it) }) { lmgApi.getActivity(requireKey()) }
+    fun loadLmgLatency() = loadInto({ copy(lmgLatency = it) }) { lmgApi.getLatency(requireKey()) }
 
     fun loadLmgMetrics(period: String) {
         if (period !in setOf("1h", "24h", "7d", "30d")) return
@@ -316,6 +335,8 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
     fun loadLmgDevices() = loadInto({ copy(lmgDevices = it) }) { lmgApi.getDevices(requireKey()) }
     fun loadLmgConfig() = loadInto({ copy(lmgConfig = it) }) { lmgApi.getConfig(requireKey()) }
     fun loadLmgErrors() = loadInto({ copy(lmgErrors = it) }) { lmgApi.getErrors(requireKey()) }
+    fun loadLmgClientErrors() = loadInto({ copy(lmgClientErrors = it) }) { lmgApi.getClientErrors(requireKey()) }
+    fun loadLmgRateLimits() = loadInto({ copy(lmgRateLimits = it) }) { lmgApi.getRateLimits(requireKey()) }
 
     fun loadLmgUser(partnerUserId: String) =
         loadInto({ copy(lmgSelectedUser = it) }) { lmgApi.getUser(requireKey(), partnerUserId) }
@@ -341,6 +362,15 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
         "Пользователь удалён"
     }
 
+    fun setLmgBanned(partnerUserId: String, banned: Boolean, reason: String = "") =
+        action("lmg.user.ban.$partnerUserId") {
+            val updated = lmgApi.setBanned(requireKey(), partnerUserId, banned, reason)
+            _state.update { it.copy(lmgSelectedUser = LoadState.Ready(updated)) }
+            loadLmgUsers()
+            loadLmgActivity()
+            if (banned) "Пользователь заблокирован" else "Пользователь разблокирован"
+        }
+
     fun saveLmgConfig(previous: LmgConfig, updated: LmgConfig) = action("lmg.config.save") {
         val saved = lmgApi.updateConfig(requireKey(), previous, updated)
         _state.update { it.copy(lmgConfig = LoadState.Ready(saved)) }
@@ -364,6 +394,90 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 _state.update { it.copy(busyAction = null) }
             }
         }
+    }
+
+    fun clearLmgClientErrors() = action("lmg.client-errors.clear") {
+        lmgApi.clearClientErrors(requireKey())
+        loadLmgClientErrors()
+        "Клиентские ошибки очищены"
+    }
+
+    fun clearLmgRateLimits(ip: String? = null) = action("lmg.ratelimits.clear") {
+        lmgApi.clearRateLimits(requireKey(), ip)
+        loadLmgRateLimits()
+        if (ip.isNullOrBlank()) "Все оперативные лимиты очищены" else "Лимит для $ip очищен"
+    }
+
+    fun loadLmgBackup() {
+        if (_state.value.busyAction != null) return
+        _state.update { it.copy(busyAction = "lmg.backup", lmgBackup = LoadState.Loading) }
+        viewModelScope.launch {
+            try {
+                val backup = lmgApi.downloadBackup(requireKey())
+                _state.update { it.copy(lmgBackup = LoadState.Ready(backup)) }
+            } catch (failure: ApiFailure) {
+                onRequestFailure(failure) { message ->
+                    _state.update { it.copy(lmgBackup = LoadState.Error(message)) }
+                    _messages.tryEmit(message)
+                }
+            } finally {
+                _state.update { it.copy(busyAction = null) }
+            }
+        }
+    }
+
+    fun cancelLmgBackup() {
+        _state.update { it.copy(lmgBackup = LoadState.Idle) }
+    }
+
+    fun saveLmgBackup(uri: Uri) {
+        val backup = (_state.value.lmgBackup as? LoadState.Ready)?.value ?: return
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val output = getApplication<Application>().contentResolver.openOutputStream(uri)
+                        ?: throw ApiFailure.BadRequest("Не удалось открыть выбранный файл")
+                    output.use { it.write(backup.bytes) }
+                }
+                _state.update { it.copy(lmgBackup = LoadState.Idle) }
+                _messages.emit("Резервная копия сохранена")
+            } catch (failure: ApiFailure) {
+                _state.update { it.copy(lmgBackup = LoadState.Error(failure.userMessage())) }
+                _messages.emit(failure.userMessage())
+            } catch (_: IOException) {
+                _state.update { it.copy(lmgBackup = LoadState.Error("Не удалось сохранить резервную копию")) }
+                _messages.emit("Не удалось сохранить резервную копию")
+            } catch (_: SecurityException) {
+                _state.update { it.copy(lmgBackup = LoadState.Error("Не удалось сохранить резервную копию")) }
+                _messages.emit("Не удалось сохранить резервную копию")
+            }
+        }
+    }
+
+    fun rotateLmgKey() {
+        if (_state.value.busyAction != null) return
+        _state.update { it.copy(busyAction = "lmg.rotate-key", lmgRotatedKey = LoadState.Loading) }
+        viewModelScope.launch {
+            try {
+                val newKey = lmgApi.rotateKey(requireKey())
+                val saved = withContext(Dispatchers.IO) { keyStore.save(newKey) }
+                sessionKey = newKey
+                pendingSavedKey = newKey
+                _state.update { it.copy(lmgRotatedKey = LoadState.Ready(LmgRotatedKey(newKey, saved))) }
+                if (!saved) _messages.emit("Новый ключ не удалось сохранить. Скопируйте его сейчас")
+            } catch (failure: ApiFailure) {
+                onRequestFailure(failure) { message ->
+                    _state.update { it.copy(lmgRotatedKey = LoadState.Error(message)) }
+                    _messages.tryEmit(message)
+                }
+            } finally {
+                _state.update { it.copy(busyAction = null) }
+            }
+        }
+    }
+
+    fun clearRotatedLmgKey() {
+        _state.update { it.copy(lmgRotatedKey = LoadState.Idle) }
     }
 
     fun loadDevices(login: String = "", activeOnly: Boolean = false) =
@@ -633,7 +747,7 @@ class AdminViewModel(application: Application) : AndroidViewModel(application) {
                 val stats = api.getStats(key)
                 sessionKey = key
                 pendingSavedKey = key
-                if (!persisted) keyStore.save(key)
+                if (!persisted) withContext(Dispatchers.IO) { keyStore.save(key) }
                 _state.update { it.copy(auth = AuthState.Unlocked, stats = LoadState.Ready(stats)) }
                 loadHealth()
                 loadMetrics("24h")
