@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.gsgit.admin.data.LmgConfig
 import org.gsgit.admin.data.LmgUser
-import org.gsgit.admin.ui.kyant.components.AnimatedListItem
 import org.gsgit.admin.ui.theme.AdminTheme
 import java.time.Instant
 import java.time.ZoneId
@@ -279,9 +278,8 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         itemsIndexed(
             visibleUsers,
             key = { index, user -> user.partnerUserId.ifBlank { "lmg-user-$index" } },
-        ) { index, user ->
-            AnimatedListItem(index) {
-                AdminCard(onClick = { viewModel.loadLmgUser(user.partnerUserId) }) {
+        ) { _, user ->
+            AdminCard(onClick = { viewModel.loadLmgUser(user.partnerUserId) }) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {
                             AdminText(user.name.ifBlank { "Без имени" }, fontSize = 15.sp, fontWeight = FontWeight.Bold)
@@ -298,7 +296,6 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
                     AdminKeyValue("устройства", user.devices.toString())
                     AdminKeyValue("ручной грант", if (user.localGrant) "да" else "нет")
                     AdminKeyValue("активность", formatLmgEpoch(user.lastSeenAt))
-                }
             }
         }
 
@@ -322,9 +319,8 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         val devices = (state.lmgDevices as? LoadState.Ready)?.value?.items.orEmpty()
-        itemsIndexed(devices, key = { index, device -> device.deviceId.ifBlank { "lmg-device-$index" } }) { index, device ->
-            AnimatedListItem(index) {
-                AdminCard {
+        itemsIndexed(devices, key = { index, device -> device.deviceId.ifBlank { "lmg-device-$index" } }) { _, device ->
+            AdminCard {
                     AdminText(device.name.ifBlank { "Без имени" }, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     AdminText(device.deviceId, color = AdminTheme.colors.textMuted, fontSize = 10.sp)
                     Spacer(Modifier.height(5.dp))
@@ -335,7 +331,6 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
                     AdminKeyValue("гео", formatLmgGeo(device.cc, device.country, device.city))
                     AdminKeyValue("первый вход", formatLmgEpoch(device.firstSeen))
                     AdminKeyValue("активность", formatLmgEpoch(device.lastSeen))
-                }
             }
         }
 
@@ -397,9 +392,8 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         val errors = (state.lmgErrors as? LoadState.Ready)?.value.orEmpty()
-        itemsIndexed(errors, key = { index, error -> "${error.code}-${error.lastAt}-$index" }) { index, error ->
-            AnimatedListItem(index) {
-                AdminCard {
+        itemsIndexed(errors, key = { index, error -> "${error.code}-${error.lastAt}-$index" }) { _, error ->
+            AdminCard {
                     Row(Modifier.fillMaxWidth()) {
                         AdminText(error.code.ifBlank { "UNKNOWN" }, color = AdminTheme.colors.error, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                         AdminText("×${error.count}", color = AdminTheme.colors.textSecondary)
@@ -408,7 +402,6 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
                     AdminText(error.message.ifBlank { "Без описания" })
                     AdminKeyValue("первая", formatLmgEpoch(error.firstAt))
                     AdminKeyValue("последняя", formatLmgEpoch(error.lastAt))
-                }
             }
         }
 
@@ -486,13 +479,11 @@ fun LmgAdminScreen(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         val rateLimits = (state.lmgRateLimits as? LoadState.Ready)?.value.orEmpty()
-        itemsIndexed(rateLimits, key = { index, limit -> limit.ip.ifBlank { "rate-limit-$index" } }) { index, limit ->
-            AnimatedListItem(index) {
-                AdminCard {
+        itemsIndexed(rateLimits, key = { index, limit -> limit.ip.ifBlank { "rate-limit-$index" } }) { _, limit ->
+            AdminCard {
                     AdminText(limit.ip.ifBlank { "неизвестный IP" }, fontWeight = FontWeight.Bold)
                     AdminKeyValue("запросов за минуту", limit.hitsLastMin.toString())
                     AdminTextAction("снять лимит", { viewModel.clearLmgRateLimits(limit.ip) }, destructive = true)
-                }
             }
         }
 
